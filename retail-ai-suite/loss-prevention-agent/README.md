@@ -159,19 +159,28 @@ export SCENESCAPE_API_PASSWORD=<password>
 source setup.sh --run
 ```
 
-Name-pattern rules in `zone_config.json` control the mapping:
+Name matching rules in `zone_config.json` control the mapping — region names in SceneScape must match exactly:
 ```json
 {
-  "zone_rules": [
-    {"name_pattern": "checkout|register|cashier|till", "type": "CHECKOUT"},
-    {"name_pattern": "exit|door|entrance|gate", "type": "EXIT"},
-    {"name_pattern": "electronics|jewelry|cosmetics|high.?value", "type": "HIGH_VALUE"},
-    {"name_pattern": "stock.?room|staff|restricted|office", "type": "RESTRICTED"}
-  ]
+  "scene_name": "Retail",
+  "scenescape_api": {
+    "base_url": "https://web.scenescape.intel.com",
+    "auth_path": "/api/v1/auth",
+    "scenes_path": "/api/v1/scenes",
+    "regions_path": "/api/v1/regions",
+    "verify_ssl": false
+  },
+  "zones": {
+    "jewelry_zone": "HIGH_VALUE",
+    "entrance_exit_zone": "EXIT",
+    "restricted_office_zone": "RESTRICTED",
+    "checkout_zone": "CHECKOUT"
+  }
 }
 ```
 
-Any SceneScape region whose name matches a pattern is automatically assigned that zone type.
+- `scene_name` — human-readable scene name (resolved to UUID at startup via SceneScape API)
+- `zones` — maps SceneScape region names to LP zone types. Create regions in SceneScape with these exact names, and they'll be auto-discovered.
 
 ### Option B: Runtime API (no restart)
 
