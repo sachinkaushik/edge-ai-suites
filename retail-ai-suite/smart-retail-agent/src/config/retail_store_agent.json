@@ -1,0 +1,43 @@
+{
+  "store": {
+    "name": "retail_store_1",
+    "id": "store_001"
+  },
+  "cameras": [
+    {
+      "name": "atag-qcam1",
+      "number": 1,
+      "description": "Queuing camera 1",
+      "data_topic": "scenescape/data/camera/atag-qcam1",
+      "image_topic": "scenescape/image/camera/atag-qcam1"
+    },
+    {
+      "name": "atag-qcam2",
+      "number": 2,
+      "description": "Queuing camera 2",
+      "data_topic": "scenescape/data/camera/atag-qcam2",
+      "image_topic": "scenescape/image/camera/atag-qcam2"
+    }
+  ],
+  "mqtt": {
+    "host": "broker.scenescape.intel.com",
+    "port": 1883,
+    "use_tls": true,
+    "cert_required": false,
+    "verify_hostname": false,
+    "ca_cert_path": "secrets/certs/scenescape-ca.pem",
+    "scene_data_topic_pattern": "scenescape/data/scene/+/+"
+  },
+  "vlm": {
+    "base_url": "http://vlm-openvino-serving:8000",
+    "model": "Qwen/Qwen2.5-VL-3B-Instruct",
+    "timeout_seconds": 300,
+    "max_completion_tokens": 500,
+    "temperature": 0.1,
+    "top_p": 0.1
+  },
+  "analysis": {
+    "interval_seconds": 10,
+    "analysis_window_seconds": 30
+  }
+}
