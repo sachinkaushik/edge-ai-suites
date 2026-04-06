@@ -1,0 +1,770 @@
+[
+  {
+    "topic": "scenescape/event/region/3bc091c7-e449-46a0-9540-29c499bca18c/3644f9ed-c3c1-4c27-9c27-ec5f4439b37d/objects",
+    "received_at": "2026-03-30T09:04:38.127931+00:00",
+    "data": {
+      "timestamp": "2026-03-30T09:04:38.028Z",
+      "scene_id": "3bc091c7-e449-46a0-9540-29c499bca18c",
+      "scene_name": "Retail",
+      "region_id": "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d",
+      "region_name": "entrance_exit_zone",
+      "counts": {
+        "person": 1
+      },
+      "objects": [
+        {
+          "category": "person",
+          "confidence": 0.9622393250465393,
+          "center_of_mass": {
+            "x": 300,
+            "y": 54,
+            "width": 31.0,
+            "height": 54.75
+          },
+          "id": "1bad7f21-cd98-44f4-9774-8656997091c4",
+          "type": "person",
+          "translation": [
+            0.743794919624216,
+            3.493274401863556,
+            1.2867469221113174e-22
+          ],
+          "size": [
+            0.5,
+            0.5,
+            1.85
+          ],
+          "velocity": [
+            0.36342552823142804,
+            0.33891120091988597,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "visibility": [
+            "camera1"
+          ],
+          "regions": {
+            "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d": {
+              "entered": "2026-03-30T09:04:38.028Z"
+            }
+          },
+          "similarity": null,
+          "first_seen": "2026-03-30T09:04:35.548Z",
+          "camera_bounds": {
+            "camera1": {
+              "x": 269.0,
+              "y": 0.0,
+              "width": 93.0,
+              "height": 220.0
+            }
+          }
+        }
+      ],
+      "entered": [
+        {
+          "category": "person",
+          "confidence": 0.9622393250465393,
+          "center_of_mass": {
+            "x": 300,
+            "y": 54,
+            "width": 31.0,
+            "height": 54.75
+          },
+          "id": "1bad7f21-cd98-44f4-9774-8656997091c4",
+          "type": "person",
+          "translation": [
+            0.743794919624216,
+            3.493274401863556,
+            1.2867469221113174e-22
+          ],
+          "size": [
+            0.5,
+            0.5,
+            1.85
+          ],
+          "velocity": [
+            0.36342552823142804,
+            0.33891120091988597,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "visibility": [
+            "camera1"
+          ],
+          "regions": {
+            "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d": {
+              "entered": "2026-03-30T09:04:38.028Z"
+            }
+          },
+          "similarity": null,
+          "first_seen": "2026-03-30T09:04:35.548Z",
+          "camera_bounds": {
+            "camera1": {
+              "x": 269.0,
+              "y": 0.0,
+              "width": 93.0,
+              "height": 220.0
+            }
+          }
+        }
+      ],
+      "exited": [],
+      "metadata": {
+        "points": [
+          [
+            0.07,
+            4.41995
+          ],
+          [
+            1.09,
+            4.36995
+          ],
+          [
+            1.07,
+            3.44995
+          ],
+          [
+            0.09,
+            3.41995
+          ]
+        ],
+        "title": "entrance_exit_zone",
+        "uuid": "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d",
+        "area": "poly",
+        "fromSensor": false
+      }
+    }
+  },
+  {
+    "topic": "scenescape/event/region/3bc091c7-e449-46a0-9540-29c499bca18c/3644f9ed-c3c1-4c27-9c27-ec5f4439b37d/count",
+    "received_at": "2026-03-30T09:04:38.129902+00:00",
+    "data": {
+      "timestamp": "2026-03-30T09:04:38.028Z",
+      "scene_id": "3bc091c7-e449-46a0-9540-29c499bca18c",
+      "scene_name": "Retail",
+      "region_id": "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d",
+      "region_name": "entrance_exit_zone",
+      "counts": {
+        "person": 1
+      },
+      "objects": [
+        {
+          "category": "person",
+          "confidence": 0.9622393250465393,
+          "center_of_mass": {
+            "x": 300,
+            "y": 54,
+            "width": 31.0,
+            "height": 54.75
+          },
+          "id": "1bad7f21-cd98-44f4-9774-8656997091c4",
+          "type": "person",
+          "translation": [
+            0.743794919624216,
+            3.493274401863556,
+            1.2867469221113174e-22
+          ],
+          "size": [
+            0.5,
+            0.5,
+            1.85
+          ],
+          "velocity": [
+            0.36342552823142804,
+            0.33891120091988597,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "visibility": [
+            "camera1"
+          ],
+          "regions": {
+            "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d": {
+              "entered": "2026-03-30T09:04:38.028Z"
+            }
+          },
+          "similarity": null,
+          "first_seen": "2026-03-30T09:04:35.548Z",
+          "camera_bounds": {
+            "camera1": {
+              "x": 269.0,
+              "y": 0.0,
+              "width": 93.0,
+              "height": 220.0
+            }
+          }
+        }
+      ],
+      "entered": [
+        {
+          "category": "person",
+          "confidence": 0.9622393250465393,
+          "center_of_mass": {
+            "x": 300,
+            "y": 54,
+            "width": 31.0,
+            "height": 54.75
+          },
+          "id": "1bad7f21-cd98-44f4-9774-8656997091c4",
+          "type": "person",
+          "translation": [
+            0.743794919624216,
+            3.493274401863556,
+            1.2867469221113174e-22
+          ],
+          "size": [
+            0.5,
+            0.5,
+            1.85
+          ],
+          "velocity": [
+            0.36342552823142804,
+            0.33891120091988597,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "visibility": [
+            "camera1"
+          ],
+          "regions": {
+            "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d": {
+              "entered": "2026-03-30T09:04:38.028Z"
+            }
+          },
+          "similarity": null,
+          "first_seen": "2026-03-30T09:04:35.548Z",
+          "camera_bounds": {
+            "camera1": {
+              "x": 269.0,
+              "y": 0.0,
+              "width": 93.0,
+              "height": 220.0
+            }
+          }
+        }
+      ],
+      "exited": [],
+      "metadata": {
+        "points": [
+          [
+            0.07,
+            4.41995
+          ],
+          [
+            1.09,
+            4.36995
+          ],
+          [
+            1.07,
+            3.44995
+          ],
+          [
+            0.09,
+            3.41995
+          ]
+        ],
+        "title": "entrance_exit_zone",
+        "uuid": "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d",
+        "area": "poly",
+        "fromSensor": false
+      }
+    }
+  },
+  {
+    "topic": "scenescape/event/region/3bc091c7-e449-46a0-9540-29c499bca18c/3644f9ed-c3c1-4c27-9c27-ec5f4439b37d/objects",
+    "received_at": "2026-03-30T09:04:38.716706+00:00",
+    "data": {
+      "timestamp": "2026-03-30T09:04:38.548Z",
+      "scene_id": "3bc091c7-e449-46a0-9540-29c499bca18c",
+      "scene_name": "Retail",
+      "region_id": "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d",
+      "region_name": "entrance_exit_zone",
+      "counts": {
+        "person": 0
+      },
+      "objects": [],
+      "entered": [],
+      "exited": [
+        {
+          "object": {
+            "category": "person",
+            "confidence": 0.9622393250465393,
+            "center_of_mass": {
+              "x": 300,
+              "y": 54,
+              "width": 31.0,
+              "height": 54.75
+            },
+            "id": "1bad7f21-cd98-44f4-9774-8656997091c4",
+            "type": "person",
+            "translation": [
+              0.743794919624216,
+              3.493274401863556,
+              1.2867469221113174e-22
+            ],
+            "size": [
+              0.5,
+              0.5,
+              1.85
+            ],
+            "velocity": [
+              0.36342552823142804,
+              0.33891120091988597,
+              0.0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "visibility": [
+              "camera1"
+            ],
+            "regions": {},
+            "similarity": null,
+            "first_seen": "2026-03-30T09:04:35.548Z",
+            "camera_bounds": {
+              "camera1": {
+                "x": 269.0,
+                "y": 0.0,
+                "width": 93.0,
+                "height": 220.0
+              }
+            }
+          },
+          "dwell": 0.5199999809265137
+        }
+      ],
+      "metadata": {
+        "points": [
+          [
+            0.07,
+            4.41995
+          ],
+          [
+            1.09,
+            4.36995
+          ],
+          [
+            1.07,
+            3.44995
+          ],
+          [
+            0.09,
+            3.41995
+          ]
+        ],
+        "title": "entrance_exit_zone",
+        "uuid": "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d",
+        "area": "poly",
+        "fromSensor": false
+      }
+    }
+  },
+  {
+    "topic": "scenescape/event/region/3bc091c7-e449-46a0-9540-29c499bca18c/dc343e24-7cdb-4a54-b33c-366185358a77/objects",
+    "received_at": "2026-03-30T09:04:38.718078+00:00",
+    "data": {
+      "timestamp": "2026-03-30T09:04:38.548Z",
+      "scene_id": "3bc091c7-e449-46a0-9540-29c499bca18c",
+      "scene_name": "Retail",
+      "region_id": "dc343e24-7cdb-4a54-b33c-366185358a77",
+      "region_name": "restricted_office_zone",
+      "counts": {
+        "person": 1
+      },
+      "objects": [
+        {
+          "category": "person",
+          "confidence": 0.9989004135131836,
+          "center_of_mass": {
+            "x": 195,
+            "y": 156,
+            "width": 44.333333333333336,
+            "height": 75.75
+          },
+          "id": "f56d318b-e5fc-49aa-b5d9-91701c3dc085",
+          "type": "person",
+          "translation": [
+            3.0023263897537387,
+            4.42694332140472,
+            0.0
+          ],
+          "size": [
+            0.5,
+            0.5,
+            1.85
+          ],
+          "velocity": [
+            -1.1746288833147962,
+            -0.18868093550568776,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "visibility": [
+            "camera1",
+            "camera2"
+          ],
+          "regions": {
+            "dc343e24-7cdb-4a54-b33c-366185358a77": {
+              "entered": "2026-03-30T09:04:38.548Z"
+            }
+          },
+          "similarity": null,
+          "first_seen": "2026-03-30T09:04:37.466Z",
+          "camera_bounds": {
+            "camera2": {
+              "x": 151.0,
+              "y": 81.0,
+              "width": 133.0,
+              "height": 304.0
+            }
+          }
+        }
+      ],
+      "entered": [
+        {
+          "category": "person",
+          "confidence": 0.9989004135131836,
+          "center_of_mass": {
+            "x": 195,
+            "y": 156,
+            "width": 44.333333333333336,
+            "height": 75.75
+          },
+          "id": "f56d318b-e5fc-49aa-b5d9-91701c3dc085",
+          "type": "person",
+          "translation": [
+            3.0023263897537387,
+            4.42694332140472,
+            0.0
+          ],
+          "size": [
+            0.5,
+            0.5,
+            1.85
+          ],
+          "velocity": [
+            -1.1746288833147962,
+            -0.18868093550568776,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "visibility": [
+            "camera1",
+            "camera2"
+          ],
+          "regions": {
+            "dc343e24-7cdb-4a54-b33c-366185358a77": {
+              "entered": "2026-03-30T09:04:38.548Z"
+            }
+          },
+          "similarity": null,
+          "first_seen": "2026-03-30T09:04:37.466Z",
+          "camera_bounds": {
+            "camera2": {
+              "x": 151.0,
+              "y": 81.0,
+              "width": 133.0,
+              "height": 304.0
+            }
+          }
+        }
+      ],
+      "exited": [],
+      "metadata": {
+        "points": [
+          [
+            2.03,
+            4.41995
+          ],
+          [
+            3.01,
+            4.42995
+          ],
+          [
+            3.0,
+            3.4099500000000003
+          ],
+          [
+            2.01,
+            3.42995
+          ]
+        ],
+        "title": "restricted_office_zone",
+        "uuid": "dc343e24-7cdb-4a54-b33c-366185358a77",
+        "area": "poly",
+        "fromSensor": false
+      }
+    }
+  },
+  {
+    "topic": "scenescape/event/region/3bc091c7-e449-46a0-9540-29c499bca18c/3644f9ed-c3c1-4c27-9c27-ec5f4439b37d/count",
+    "received_at": "2026-03-30T09:04:38.720888+00:00",
+    "data": {
+      "timestamp": "2026-03-30T09:04:38.548Z",
+      "scene_id": "3bc091c7-e449-46a0-9540-29c499bca18c",
+      "scene_name": "Retail",
+      "region_id": "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d",
+      "region_name": "entrance_exit_zone",
+      "counts": {
+        "person": 0
+      },
+      "objects": [],
+      "entered": [],
+      "exited": [
+        {
+          "object": {
+            "category": "person",
+            "confidence": 0.9622393250465393,
+            "center_of_mass": {
+              "x": 300,
+              "y": 54,
+              "width": 31.0,
+              "height": 54.75
+            },
+            "id": "1bad7f21-cd98-44f4-9774-8656997091c4",
+            "type": "person",
+            "translation": [
+              0.743794919624216,
+              3.493274401863556,
+              1.2867469221113174e-22
+            ],
+            "size": [
+              0.5,
+              0.5,
+              1.85
+            ],
+            "velocity": [
+              0.36342552823142804,
+              0.33891120091988597,
+              0.0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "visibility": [
+              "camera1"
+            ],
+            "regions": {},
+            "similarity": null,
+            "first_seen": "2026-03-30T09:04:35.548Z",
+            "camera_bounds": {
+              "camera1": {
+                "x": 269.0,
+                "y": 0.0,
+                "width": 93.0,
+                "height": 220.0
+              }
+            }
+          },
+          "dwell": 0.5199999809265137
+        }
+      ],
+      "metadata": {
+        "points": [
+          [
+            0.07,
+            4.41995
+          ],
+          [
+            1.09,
+            4.36995
+          ],
+          [
+            1.07,
+            3.44995
+          ],
+          [
+            0.09,
+            3.41995
+          ]
+        ],
+        "title": "entrance_exit_zone",
+        "uuid": "3644f9ed-c3c1-4c27-9c27-ec5f4439b37d",
+        "area": "poly",
+        "fromSensor": false
+      }
+    }
+  },
+  {
+    "topic": "scenescape/event/region/3bc091c7-e449-46a0-9540-29c499bca18c/dc343e24-7cdb-4a54-b33c-366185358a77/count",
+    "received_at": "2026-03-30T09:04:38.723882+00:00",
+    "data": {
+      "timestamp": "2026-03-30T09:04:38.548Z",
+      "scene_id": "3bc091c7-e449-46a0-9540-29c499bca18c",
+      "scene_name": "Retail",
+      "region_id": "dc343e24-7cdb-4a54-b33c-366185358a77",
+      "region_name": "restricted_office_zone",
+      "counts": {
+        "person": 1
+      },
+      "objects": [
+        {
+          "category": "person",
+          "confidence": 0.9989004135131836,
+          "center_of_mass": {
+            "x": 195,
+            "y": 156,
+            "width": 44.333333333333336,
+            "height": 75.75
+          },
+          "id": "f56d318b-e5fc-49aa-b5d9-91701c3dc085",
+          "type": "person",
+          "translation": [
+            3.0023263897537387,
+            4.42694332140472,
+            0.0
+          ],
+          "size": [
+            0.5,
+            0.5,
+            1.85
+          ],
+          "velocity": [
+            -1.1746288833147962,
+            -0.18868093550568776,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "visibility": [
+            "camera1",
+            "camera2"
+          ],
+          "regions": {
+            "dc343e24-7cdb-4a54-b33c-366185358a77": {
+              "entered": "2026-03-30T09:04:38.548Z"
+            }
+          },
+          "similarity": null,
+          "first_seen": "2026-03-30T09:04:37.466Z",
+          "camera_bounds": {
+            "camera2": {
+              "x": 151.0,
+              "y": 81.0,
+              "width": 133.0,
+              "height": 304.0
+            }
+          }
+        }
+      ],
+      "entered": [
+        {
+          "category": "person",
+          "confidence": 0.9989004135131836,
+          "center_of_mass": {
+            "x": 195,
+            "y": 156,
+            "width": 44.333333333333336,
+            "height": 75.75
+          },
+          "id": "f56d318b-e5fc-49aa-b5d9-91701c3dc085",
+          "type": "person",
+          "translation": [
+            3.0023263897537387,
+            4.42694332140472,
+            0.0
+          ],
+          "size": [
+            0.5,
+            0.5,
+            1.85
+          ],
+          "velocity": [
+            -1.1746288833147962,
+            -0.18868093550568776,
+            0.0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "visibility": [
+            "camera1",
+            "camera2"
+          ],
+          "regions": {
+            "dc343e24-7cdb-4a54-b33c-366185358a77": {
+              "entered": "2026-03-30T09:04:38.548Z"
+            }
+          },
+          "similarity": null,
+          "first_seen": "2026-03-30T09:04:37.466Z",
+          "camera_bounds": {
+            "camera2": {
+              "x": 151.0,
+              "y": 81.0,
+              "width": 133.0,
+              "height": 304.0
+            }
+          }
+        }
+      ],
+      "exited": [],
+      "metadata": {
+        "points": [
+          [
+            2.03,
+            4.41995
+          ],
+          [
+            3.01,
+            4.42995
+          ],
+          [
+            3.0,
+            3.4099500000000003
+          ],
+          [
+            2.01,
+            3.42995
+          ]
+        ],
+        "title": "restricted_office_zone",
+        "uuid": "dc343e24-7cdb-4a54-b33c-366185358a77",
+        "area": "poly",
+        "fromSensor": false
+      }
+    }
+  }
+]
