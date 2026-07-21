@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -67,14 +69,38 @@ def _open_video_writer(output: Path, fps: int, width: int, height: int, codec: s
         except Exception as exc:
             last_error = exc
 
-    hint = " / ".join(H264_CODEC_CANDIDATES)
-    detail = f" Last error: {last_error}" if last_error is not None else ""
-    raise RuntimeError(
-        "Failed to open H.264 writer for output video. "
-        f"Tried codecs: {', '.join(candidates)}. "
-        f"Use --codec <FOURCC> or keep --codec auto (tries {hint})."
-        f"{detail}"
-    )
+    return None, last_error
+
+
+def _open_ffmpeg_writer(output: Path, fps: int, width: int, height: int):
+    """Pipe raw BGR frames to the system ffmpeg (libx264) for H.264 encoding.
+
+    Used as a fallback when OpenCV's bundled FFmpeg lacks an H.264 encoder.
+    """
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        return None
+
+    cmd = [
+        ffmpeg,
+        "-hide_banner",
+        "-loglevel", "error",
+        "-y",
+        "-f", "rawvideo",
+        "-pix_fmt", "bgr24",
+        "-s", f"{width}x{height}",
+        "-r", str(fps),
+        "-i", "-",
+        "-an",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "medium",
+        "-crf", "18",
+        "-movflags", "+faststart",
+        str(output),
+    ]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    return proc
 
 
 def build_video(
@@ -93,7 +119,27 @@ def build_video(
     output.parent.mkdir(parents=True, exist_ok=True)
     total_frames = seconds * fps
 
-    writer, selected_codec = _open_video_writer(output, fps, width, height, codec)
+    writer, open_error = _open_video_writer(output, fps, width, height, codec)
+    ffmpeg_proc = None
+    selected_codec = None
+
+    if writer is not None:
+        selected_codec = open_error  # _open_video_writer returns the codec here
+    else:
+        # OpenCV's bundled FFmpeg could not open an H.264 writer; fall back to
+        # piping frames to the system ffmpeg (libx264).
+        ffmpeg_proc = _open_ffmpeg_writer(output, fps, width, height)
+        if ffmpeg_proc is None:
+            hint = " / ".join(H264_CODEC_CANDIDATES)
+            detail = f" Last error: {open_error}" if open_error is not None else ""
+            raise RuntimeError(
+                "Failed to open an H.264 writer for the output video and system "
+                "'ffmpeg' was not found on PATH. "
+                f"OpenCV tried codecs: {hint}. "
+                "Install ffmpeg (with libx264) or use --codec <FOURCC>."
+                f"{detail}"
+            )
+        selected_codec = "libx264 (system ffmpeg)"
 
     print(f"[video] source images : {images_dir}")
     print(f"[video] image count   : {len(images)}")
@@ -109,12 +155,22 @@ def build_video(
                 raise RuntimeError(f"Failed to read image: {img_path}")
 
             out = _resize_cover(frame, width, height)
-            writer.write(out)
+            if writer is not None:
+                writer.write(out)
+            else:
+                ffmpeg_proc.stdin.write(out.tobytes())
 
             if i == 0 or (i + 1) % 300 == 0 or (i + 1) == total_frames:
                 print(f"[video] progress      : {i + 1}/{total_frames}")
     finally:
-        writer.release()
+        if writer is not None:
+            writer.release()
+        if ffmpeg_proc is not None:
+            if ffmpeg_proc.stdin:
+                ffmpeg_proc.stdin.close()
+            ret = ffmpeg_proc.wait()
+            if ret != 0:
+                raise RuntimeError(f"ffmpeg exited with code {ret} while encoding {output}")
 
     print("[video] done")
 

@@ -35,6 +35,7 @@ models/**/*.onnx
 models/**/*.pt
 models/**/*.pth
 models/**/*.hdf5
+models.zip
 **/model_cache/
 **/.cache/
 

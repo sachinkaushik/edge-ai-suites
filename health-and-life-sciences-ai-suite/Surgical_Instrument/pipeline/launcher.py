@@ -46,6 +46,11 @@ HTTP_PORT   = int(os.environ.get("PIPELINE_HTTP_PORT", "8000"))
 # backward compat with the pre-multi-source docker-compose.yaml.
 SOURCE_KIND = os.environ.get("SOURCE_KIND", "file").lower()
 SOURCE_ARG  = os.environ.get("SOURCE_ARG", VIDEO)
+# gvadetect pre-process backend. "ie" (default) is CPU-side and works with any
+# source memory type. "va-surface-sharing" is zero-copy on the GPU (no per-frame
+# GPU<->CPU copy) and is faster, but requires VA-backed decode - use it only
+# with GPU file/RTSP H.264 sources, NOT v4l2/basler (system-memory buffers).
+PP_BACKEND  = os.environ.get("PP_BACKEND", "ie").lower()
 # If the pipeline restarts more than this many times within RESPAWN_WINDOW_S
 # seconds we give up (protects against a config error that instant-crashes).
 RESPAWN_MAX     = int(os.environ.get("RESPAWN_MAX", "6"))
@@ -83,6 +88,7 @@ def _spawn(device: str, source_kind: str, source_arg: str) -> subprocess.Popen:
         mqtt_host=MQTT_HOST,
         mqtt_topic=MQTT_TOPIC,
         frame_path=str(FRAME_PATH),
+        pp_backend=PP_BACKEND,
     )
     # Truncate the latency log per run so stale ticks don't skew p99.
     LATENCY_LOG.write_text("")
