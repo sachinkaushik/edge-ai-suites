@@ -31,6 +31,11 @@ LOG_FILE="${LOG_DIR}/most_optimized.log"
 TXT_FILE="${LOG_DIR}/most_optimized.summary.txt"
 IMAGE="${IMAGE:-surgical-pipeline:dev}"
 FRAMES="${FRAMES:-3000}"
+# Optional: SCALE_METHOD=fast enables VAAPI-based resize in preprocessing.
+# Leave empty for the gvadetect default. Set via: SCALE_METHOD=fast bash run_latency.sh
+SCALE_METHOD="${SCALE_METHOD:-}"
+SCALE_OPT=""
+if [[ -n "${SCALE_METHOD}" ]]; then SCALE_OPT="scale-method=${SCALE_METHOD} "; fi
 
 mkdir -p "${LOG_DIR}"
 cd "${ROOT_DIR}"
@@ -48,7 +53,7 @@ PIPELINE="gst-launch-1.0 -v \
   identity sync=true eos-after=${FRAMES} ! \
   queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! \
   gvadetect model=/models/yolo11n_polyp/best_openvino_model/best.xml device=GPU threshold=0.5 \
-    pre-process-backend=va-surface-sharing nireq=2 ie-config=PERFORMANCE_HINT=LATENCY ! \
+    pre-process-backend=va-surface-sharing ${SCALE_OPT} nireq=2 ie-config=PERFORMANCE_HINT=LATENCY ! \
   queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! \
   gvawatermark ! gvafpscounter interval=1 ! \
   fakesink sync=false async=false"
