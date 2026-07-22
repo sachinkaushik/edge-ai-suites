@@ -68,7 +68,7 @@ echo "${PIPELINE}"
 echo "============================================================"
 
 docker run --rm --entrypoint bash --net=host \
-  -e 'GST_TRACERS=latency(flags=element)' \
+  -e 'GST_TRACERS=latency(flags=pipeline)' \
   -e GST_DEBUG=GST_TRACER:7 \
   -e GST_DEBUG_NO_COLOR=1 \
   -v "${ROOT_DIR}/models:/models:ro" \

@@ -110,7 +110,7 @@ echo "${CMD}"
 echo "============================================================"
 
 docker run --rm --entrypoint bash --net=host \
-  -e 'GST_TRACERS=latency(flags=element)' \
+  -e 'GST_TRACERS=latency(flags=pipeline+element)' \
   -e GST_DEBUG=GST_TRACER:7 \
   -e GST_DEBUG_NO_COLOR=1 \
   "${DISPLAY_ARGS[@]}" \
@@ -137,42 +137,58 @@ if [[ "${DISPLAY_VIEW}" == "1" ]]; then
 fi
 
 echo
-echo "===== CRITICAL-PATH (live camera-to-screen) LATENCY ====="
+echo "===== LIVE CAMERA LATENCY ====="
 python3 - "${LOG_FILE}" "${TXT_FILE}" <<'PY'
 import re, sys, statistics
 
 log, txt_out = sys.argv[1], sys.argv[2]
 COMPUTE_PREFIXES = ("gvadetect", "gvawatermark", "gvafpscounter")
-rec = re.compile(r"\selement-latency,.*element=\(string\)([^,]+),.*time=\(guint64\)(\d+)")
+elem_re = re.compile(r"\selement-latency,.*element=\(string\)([^,]+),.*time=\(guint64\)(\d+)")
+# whole-pipeline record: "... latency, src-element-id=... time=(guint64)N ..."
+# (NOT "element-latency,"). This is fdsrc(source) -> sink end-to-end residency.
+pipe_re = re.compile(r"\s(?<!element-)latency,.*time=\(guint64\)(\d+)")
+
 per_elem = {}
+e2e = []
 with open(log, errors="ignore") as f:
     for line in f:
-        m = rec.search(line)
-        if not m:
+        m = elem_re.search(line)
+        if m:
+            ms = int(m.group(2)) / 1e6
+            if ms <= 60_000.0:
+                per_elem.setdefault(m.group(1), []).append(ms)
             continue
-        name, t_ns = m.group(1), int(m.group(2))
-        ms = t_ns / 1e6
-        if ms > 60_000.0:          # drop guint64 underflow wraps
-            continue
-        per_elem.setdefault(name, []).append(ms)
+        p = pipe_re.search(line)
+        if p:
+            ms = int(p.group(1)) / 1e6
+            if ms <= 60_000.0:
+                e2e.append(ms)
 
-if not per_elem:
-    sys.exit("No element-latency records found (camera may not have started).")
+if not per_elem and not e2e:
+    sys.exit("No latency records found (camera may not have started).")
+
+def stats(vals):
+    v = sorted(vals)
+    return (statistics.mean(v), v[len(v)//2], v[min(len(v)-1, int(0.99*len(v)+0.5))])
 
 lines = []
-critical = 0.0
 lines.append(f"{'element':<20} {'samples':>8} {'mean_ms':>9} {'p99_ms':>8}")
 lines.append("-" * 48)
+critical = 0.0
 for name in sorted(per_elem):
-    vals = sorted(per_elem[name])
-    mean = statistics.mean(vals)
-    p99 = vals[min(len(vals) - 1, int(0.99 * len(vals) + 0.5))]
+    mean, _, p99 = stats(per_elem[name])
     on_path = name.startswith(COMPUTE_PREFIXES)
-    lines.append(f"{name:<20} {len(vals):>8} {mean:>9.3f} {p99:>8.3f}{' *' if on_path else ''}")
+    lines.append(f"{name:<20} {len(per_elem[name]):>8} {mean:>9.3f} {p99:>8.3f}{' *' if on_path else ''}")
     if on_path:
         critical += mean
 lines.append("-" * 48)
-lines.append(f"{'CRITICAL PATH (sum of *)':<38} {critical:>9.3f} ms")
+lines.append(f"{'compute critical path (gva* sum)':<38} {critical:>9.3f} ms")
+if e2e:
+    mean, p50, p99 = stats(e2e)
+    lines.append(f"{'E2E PIPELINE (fdsrc->sink, mean)':<38} {mean:>9.3f} ms")
+    lines.append(f"{'E2E PIPELINE (p50 / p99)':<38} {p50:>9.3f} / {p99:.3f} ms")
+    lines.append("(E2E = whole-pipeline source->sink; camera self-paced so this is")
+    lines.append(" honest. Excludes sensor exposure/USB in + display scanout out.)")
 
 out = "\n".join(lines) + "\n"
 print(out, end="")
