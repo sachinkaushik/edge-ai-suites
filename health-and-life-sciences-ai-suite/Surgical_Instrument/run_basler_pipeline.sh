@@ -86,10 +86,22 @@ elif [[ "${DISPLAY_VIEW}" == "1" ]]; then
   # autovideosink picks xvimagesink/glimagesink, which FAIL over RDP (no Xv/GL).
   # Default to plain software ximagesink (RDP-safe). Override with VSINK=...
   VSINK="${VSINK:-ximagesink}"
-  SINK_TAIL="gvawatermark ! gvafpscounter interval=1 ! \
-    vapostproc ! \"video/x-raw\" ! videoconvert ! \
-    ${VSINK} sync=false"
-  MODE_DESC="DISPLAY (live ${VSINK} window)"
+  if [[ "${MINIMAL:-0}" == "1" ]]; then
+    # Lean path: keep vapostproc (needed for the sink to negotiate a surface it
+    # can display - a bare "gvawatermark ! sink" fails with not-negotiated),
+    # but drop gvafpscounter and the explicit videoconvert download. vapostproc
+    # lets a hardware/GL sink import the surface; add videoconvert back if the
+    # chosen sink still refuses (software sinks like ximagesink need it).
+    SINK_TAIL="gvawatermark ! vapostproc ! ${VSINK} sync=false"
+    MODE_DESC="DISPLAY (minimal: gvawatermark ! vapostproc ! ${VSINK})"
+  else
+    # Full path: download VAMemory -> system before the sink (needed for
+    # software X sinks). Harmless (~0 ms) with a hardware sink.
+    SINK_TAIL="gvawatermark ! gvafpscounter interval=1 ! \
+      vapostproc ! \"video/x-raw\" ! videoconvert ! \
+      ${VSINK} sync=false"
+    MODE_DESC="DISPLAY (live ${VSINK} window)"
+  fi
   VID_MOUNT=()
   DISPLAY_ARGS=(-e DISPLAY="${DISPLAY}" -e XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}" -v /tmp/.X11-unix:/tmp/.X11-unix:rw)
 else

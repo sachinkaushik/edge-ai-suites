@@ -133,45 +133,15 @@ DISPLAY_VIEW=1 LEAKY=0 FRAMES=3000 bash run_basler_pipeline.sh
 SERIAL=40067928 RECORD=1 FRAMES=1200 bash run_basler_pipeline.sh
 ```
 
-### Generated pipeline (recommended live command)
+### Live display commands + results
 
-`DISPLAY_VIEW=1 LEAKY=1 FRAMES=3000 bash run_basler_pipeline.sh` expands to:
+Two commands produce a live window with detection boxes (run from the RDP /
+desktop GUI terminal). Both use `LEAKY=1` (freshest-frame-wins) and let
+`autovideosink` pick a hardware sink.
 
-```bash
-python3 /opt/basler_reader.py --geometry 1920x1080@60 --pixel-format uyvy \
-  | gst-launch-1.0 \
-    fdsrc fd=0 blocksize=4147200 do-timestamp=true ! \
-    rawvideoparse format=yuy2 width=1920 height=1080 framerate=60/1 ! \
-    vapostproc ! "video/x-raw(memory:VAMemory),format=NV12" ! \
-    identity eos-after=3000 ! \
-    queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
-    gvadetect model=/models/yolo11n_polyp/best_openvino_model/best.xml device=GPU threshold=0.5 \
-      pre-process-backend=va-surface-sharing nireq=1 ie-config=PERFORMANCE_HINT=LATENCY ! \
-    queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
-    gvawatermark ! gvafpscounter interval=1 ! \
-    vapostproc ! "video/x-raw" ! videoconvert ! ximagesink sync=false
-```
-
-| Segment | Role |
-|---------|------|
-| `basler_reader.py … uyvy` | pypylon bridge \u2192 stdout UYVY frames |
-| `fdsrc blocksize=4147200` | one 1920\u00d71080\u00d72-byte UYVY frame per pull |
-| `rawvideoparse format=yuy2` | label raw bytes as 1080p60 video |
-| `vapostproc ! VAMemory,NV12` | UYVY\u2192NV12 **on GPU** |
-| `identity eos-after=3000` | stop after 3000 frames (`FRAMES`) |
-| `queue … leaky=downstream` (\u00d72) | **LEAKY=1**: newest-frame-wins, \u22641 buffer / ~1 frame |
-| `gvadetect … va-surface-sharing nireq=1 LATENCY` | zero-copy GPU inference |
-| `gvawatermark` | draw detection boxes |
-| `vapostproc ! video/x-raw ! videoconvert` | GPU\u2192system download (needed for X sink) |
-| `ximagesink sync=false` | **DISPLAY_VIEW=1** live window (RDP-safe) |
-
-> On a **real monitor** use `VSINK=glimagesink` \u2014 it imports the GPU surface
-> directly, dropping the trailing `vapostproc ! videoconvert` download (~12 ms).
-
-### Trying `autovideosink`
+**1. Full path** (keeps `gvafpscounter` + GPU→system download):
 
 ```bash
-# Try autovideosink (works on a real monitor; risky over RDP)
 VSINK=autovideosink DISPLAY_VIEW=1 LEAKY=1 bash run_basler_pipeline.sh
 ```
 
@@ -192,20 +162,7 @@ python3 /opt/basler_reader.py --geometry 1920x1080@60 --pixel-format uyvy \
     vapostproc ! "video/x-raw" ! videoconvert ! autovideosink sync=false
 ```
 
-`autovideosink` is an **auto-selector**, not a sink itself \u2014 it picks the best
-available sink at runtime (`glimagesink` \u2192 `xvimagesink` \u2192 `ximagesink`).
-
-| Environment | picks | result |
-|-------------|-------|--------|
-| **Real HDMI/DP monitor** | `glimagesink` (GPU/GL) | \u2705 best \u2014 zero-copy, lowest latency |
-| **RDP** | `glimagesink`/`xvimagesink` | \u274c usually black / stuck (no GL/Xv over RDP) |
-
-> Over RDP prefer `VSINK=ximagesink` (software, RDP-safe). Use `autovideosink`
-> (or `glimagesink`) only on a physical display. On a real monitor the trailing
-> `vapostproc ! videoconvert` download is unnecessary \u2014 `glimagesink` can take
-> the GPU surface directly.
-
-**Measured with `autovideosink` (hardware sink selected), LEAKY=1, 3000 frames:**
+Result:
 
 ```
 element               samples   mean_ms   p99_ms
@@ -215,17 +172,62 @@ gvawatermarkimpl0        2999     0.054    0.123 *
 gvafpscounter0           2999     0.024    0.068 *
 rawvideoparse0           3000     3.960    6.320
 vapostproc0              3000     4.328    6.152
-videoconvert0            2999     0.010    0.032   <- ~0 (HW sink, no SW convert)
+videoconvert0            2999     0.010    0.032
 ------------------------------------------------
 compute critical path (gva* sum)          10.393 ms
 CAMERA-TO-SCREEN (fdsrc->display) mean    12.910 ms
 CAMERA-TO-SCREEN (fdsrc->display) p50/p99   16.41 / 20.37 ms
 ```
 
-Camera-to-screen is **12.9 ms** here vs **33 ms** with software `ximagesink` \u2014
-because `autovideosink` selected a hardware sink, so the ~12 ms `videoconvert`
-collapses to ~0. This is the recommended display path **when a real GPU/GL
-display is available**.
+**2. Minimal path** (`MINIMAL=1` — drops `gvafpscounter` + `videoconvert`, keeps
+one `vapostproc` bridge; a bare `gvawatermark ! sink` fails `not-negotiated`):
+
+```bash
+MINIMAL=1 VSINK=autovideosink DISPLAY_VIEW=1 LEAKY=1 bash run_basler_pipeline.sh
+```
+
+Generated pipeline:
+
+```bash
+python3 /opt/basler_reader.py --geometry 1920x1080@60 --pixel-format uyvy \
+  | gst-launch-1.0 \
+    fdsrc fd=0 blocksize=4147200 do-timestamp=true ! \
+    rawvideoparse format=yuy2 width=1920 height=1080 framerate=60/1 ! \
+    vapostproc ! "video/x-raw(memory:VAMemory),format=NV12" ! \
+    identity eos-after=3000 ! \
+    queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
+    gvadetect model=/models/yolo11n_polyp/best_openvino_model/best.xml device=GPU threshold=0.5 \
+      pre-process-backend=va-surface-sharing nireq=1 ie-config=PERFORMANCE_HINT=LATENCY ! \
+    queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
+    gvawatermark ! vapostproc ! autovideosink sync=false
+```
+
+Result:
+
+```
+element               samples   mean_ms   p99_ms
+------------------------------------------------
+gvadetect0               2908    10.265   15.022 *
+gvawatermarkimpl0        2999     0.058    0.137 *
+vapostproc0              3000     2.599    4.747
+vapostproc1              2999     0.029    0.085
+------------------------------------------------
+compute critical path (gva* sum)          10.323 ms
+CAMERA-TO-SCREEN (fdsrc->display) mean    12.634 ms
+CAMERA-TO-SCREEN (fdsrc->display) p50/p99   13.73 / 17.89 ms
+```
+
+**Comparison**
+
+| Command | camera-to-screen mean | p99 | note |
+|---------|----------------------:|----:|------|
+| Full (`autovideosink`) | 12.910 ms | 20.37 | keeps fpscounter + videoconvert |
+| **Minimal (`MINIMAL=1`)** | **12.634 ms** | **17.89** | leanest; slightly lower + tighter p99 |
+
+> Over RDP with software `ximagesink` the same run is ~33 ms (the extra ~12 ms
+> is `videoconvert` for the software sink). A hardware sink removes it.
+> Use `MINIMAL=1` on a real monitor; keep the default (full) path for RDP
+> `ximagesink`.
 
 ---
 
