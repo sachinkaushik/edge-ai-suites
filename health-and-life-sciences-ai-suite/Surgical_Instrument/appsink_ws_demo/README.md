@@ -35,7 +35,85 @@ filesrc polyp_test.mp4 ! qtdemux ! h264parse ! vah264dec !
   jpegenc ! appsink        →  WebSocket broadcast  →  browser <canvas>
 ```
 
+### Generated pipeline (default: file source, GPU, LEAKY=1, QUALITY=80)
+
+`server.py` builds this string in-process via python-gi (`Gst.parse_launch`):
+
+```
+filesrc location=/videos/polyp_test.mp4 ! qtdemux ! h264parse ! vah264dec ! \
+  video/x-raw(memory:VAMemory) ! identity sync=true ! \
+  queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
+  gvadetect model=/models/yolo11n_polyp/best_openvino_model/best.xml device=GPU threshold=0.5 \
+    pre-process-backend=va-surface-sharing nireq=1 ie-config=PERFORMANCE_HINT=LATENCY ! \
+  queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
+  gvawatermark ! vapostproc ! video/x-raw ! jpegenc quality=80 ! \
+  appsink name=sink emit-signals=true max-buffers=1 drop=true sync=false
+```
+
+| Segment | Role |
+|---------|------|
+| `filesrc ! qtdemux ! h264parse ! vah264dec` | read + GPU-decode the H.264 clip |
+| `video/x-raw(memory:VAMemory)` | keep decoded frames in GPU memory |
+| `identity sync=true` | pace to real time (60 fps) so it plays at wall-clock |
+| `queue … leaky=downstream` (×2) | newest-frame-wins, ≤1 buffer / ~1 frame |
+| `gvadetect … va-surface-sharing nireq=1 LATENCY` | zero-copy GPU polyp inference |
+| `gvawatermark` | draw detection boxes |
+| `vapostproc ! video/x-raw` | download GPU→system (jpegenc is software) |
+| `jpegenc quality=80` | encode each frame to JPEG |
+| `appsink … emit-signals=true max-buffers=1 drop=true` | hand each JPEG to Python (keep only newest) |
+
+> Unlike a `gst-launch` string, this runs **inside** the Python process, so the
+> `appsink` `new-sample` callback receives the JPEG bytes directly — no file,
+> no subprocess boundary.
+
 ---
+
+## End-to-end flow (how it works)
+
+```mermaid
+flowchart LR
+    V[polyp_test.mp4] --> DEC[vah264dec<br/>GPU decode]
+    DEC --> DET[gvadetect<br/>GPU inference]
+    DET --> WM[gvawatermark<br/>draw boxes]
+    WM --> ENC[jpegenc]
+    ENC --> AS[appsink]
+    AS -->|new-sample callback<br/>JPEG bytes in RAM| PY[server.py<br/>Python]
+    PY -->|call_soon_threadsafe| Q[asyncio<br/>latest-frame]
+    Q -->|broadcast| WS[(WebSocket<br/>:8090)]
+    WS -->|binary JPEG| BR[browser client.html]
+    BR -->|createImageBitmap| CV[canvas.drawImage]
+```
+
+Step by step:
+
+1. **Decode + detect (GPU):** `vah264dec` decodes the clip on the iGPU; frames
+   stay in GPU memory (`VAMemory`); `gvadetect` runs YOLO11n zero-copy and
+   attaches detection boxes as metadata.
+2. **Annotate + encode:** `gvawatermark` draws the boxes; `vapostproc` downloads
+   the frame to system memory; `jpegenc` encodes it to JPEG.
+3. **appsink → Python (no disk):** `appsink` fires the `new-sample` callback on
+   the GStreamer streaming thread. `server.py` maps the buffer, copies the JPEG
+   bytes, and hands them to the asyncio loop via `call_soon_threadsafe`
+   (thread-safe cross-thread handoff).
+4. **Broadcast (push):** the asyncio broadcaster stores the newest frame and
+   sends it to every connected WebSocket client the instant it arrives — no
+   polling, no queue buildup (`max-buffers=1 drop=true` keeps only the latest).
+5. **Browser render:** `client.html` receives the binary JPEG over the
+   WebSocket, decodes it with `createImageBitmap`, and paints it to a `<canvas>`
+   with `drawImage` — no `<img>` re-render, no React churn.
+
+Threading model:
+- **GStreamer streaming thread** drives the `appsink` callback.
+- A background **GLib main loop** thread watches the bus for EOS/errors.
+- The **asyncio loop** (main thread) runs the WebSocket server + broadcaster.
+- The only cross-thread hop is `call_soon_threadsafe` (GStreamer → asyncio).
+
+Why it's low latency: the frame goes **RAM → RAM → socket** — no disk write/read
+and no 33 ms poll gap. Detection latency (~10 ms) is untouched because encode
+and `appsink` run **after** `gvadetect`.
+
+---
+
 
 ## Requirements
 
