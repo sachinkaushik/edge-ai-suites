@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>appsink → WebSocket → canvas (low-latency preview)</title>
+  <style>
+    body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+    header { padding: 8px 12px; display: flex; gap: 16px; align-items: center; }
+    #stat { font-variant-numeric: tabular-nums; }
+    canvas { display: block; max-width: 100vw; height: auto; background: #000; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .on { background: #2ecc71; } .off { background: #e74c3c; }
+  </style>
+</head>
+<body>
+  <header>
+    <span><span id="dot" class="dot off"></span> <span id="state">connecting…</span></span>
+    <span id="stat">-- fps · -- ms decode</span>
+  </header>
+  <canvas id="v" width="1280" height="720"></canvas>
+
+  <script>
+    // WS host: same host that served this page, or override with ?host=IP&port=8090
+    const params = new URLSearchParams(location.search);
+    const host = params.get('host') || location.hostname || 'localhost';
+    const port = params.get('port') || '8090';
+    const url = `ws://${host}:${port}`;
+
+    const canvas = document.getElementById('v');
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    const dot = document.getElementById('dot');
+    const stateEl = document.getElementById('state');
+    const statEl = document.getElementById('stat');
+
+    let frames = 0, lastT = performance.now(), decMs = 0;
+
+    function connect() {
+      const ws = new WebSocket(url);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => { dot.className = 'dot on'; stateEl.textContent = `connected ${url}`; };
+      ws.onclose = () => { dot.className = 'dot off'; stateEl.textContent = 'disconnected — retrying…'; setTimeout(connect, 1000); };
+      ws.onerror = () => { ws.close(); };
+
+      ws.onmessage = async (ev) => {
+        const t0 = performance.now();
+        try {
+          const blob = new Blob([ev.data], { type: 'image/jpeg' });
+          const bmp = await createImageBitmap(blob);
+          if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
+            canvas.width = bmp.width; canvas.height = bmp.height;
+          }
+          ctx.drawImage(bmp, 0, 0);
+          bmp.close();
+        } catch (e) { /* drop bad frame */ }
+        decMs = performance.now() - t0;
+        frames++;
+        const now = performance.now();
+        if (now - lastT >= 1000) {
+          const fps = (frames * 1000 / (now - lastT)).toFixed(0);
+          statEl.textContent = `${fps} fps · ${decMs.toFixed(1)} ms decode/draw`;
+          frames = 0; lastT = now;
+        }
+      };
+    }
+    connect();
+  </script>
+</body>
+</html>
