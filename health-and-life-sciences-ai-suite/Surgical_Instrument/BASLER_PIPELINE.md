@@ -133,6 +133,100 @@ DISPLAY_VIEW=1 LEAKY=0 FRAMES=3000 bash run_basler_pipeline.sh
 SERIAL=40067928 RECORD=1 FRAMES=1200 bash run_basler_pipeline.sh
 ```
 
+### Generated pipeline (recommended live command)
+
+`DISPLAY_VIEW=1 LEAKY=1 FRAMES=3000 bash run_basler_pipeline.sh` expands to:
+
+```bash
+python3 /opt/basler_reader.py --geometry 1920x1080@60 --pixel-format uyvy \
+  | gst-launch-1.0 \
+    fdsrc fd=0 blocksize=4147200 do-timestamp=true ! \
+    rawvideoparse format=yuy2 width=1920 height=1080 framerate=60/1 ! \
+    vapostproc ! "video/x-raw(memory:VAMemory),format=NV12" ! \
+    identity eos-after=3000 ! \
+    queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
+    gvadetect model=/models/yolo11n_polyp/best_openvino_model/best.xml device=GPU threshold=0.5 \
+      pre-process-backend=va-surface-sharing nireq=1 ie-config=PERFORMANCE_HINT=LATENCY ! \
+    queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
+    gvawatermark ! gvafpscounter interval=1 ! \
+    vapostproc ! "video/x-raw" ! videoconvert ! ximagesink sync=false
+```
+
+| Segment | Role |
+|---------|------|
+| `basler_reader.py … uyvy` | pypylon bridge \u2192 stdout UYVY frames |
+| `fdsrc blocksize=4147200` | one 1920\u00d71080\u00d72-byte UYVY frame per pull |
+| `rawvideoparse format=yuy2` | label raw bytes as 1080p60 video |
+| `vapostproc ! VAMemory,NV12` | UYVY\u2192NV12 **on GPU** |
+| `identity eos-after=3000` | stop after 3000 frames (`FRAMES`) |
+| `queue … leaky=downstream` (\u00d72) | **LEAKY=1**: newest-frame-wins, \u22641 buffer / ~1 frame |
+| `gvadetect … va-surface-sharing nireq=1 LATENCY` | zero-copy GPU inference |
+| `gvawatermark` | draw detection boxes |
+| `vapostproc ! video/x-raw ! videoconvert` | GPU\u2192system download (needed for X sink) |
+| `ximagesink sync=false` | **DISPLAY_VIEW=1** live window (RDP-safe) |
+
+> On a **real monitor** use `VSINK=glimagesink` \u2014 it imports the GPU surface
+> directly, dropping the trailing `vapostproc ! videoconvert` download (~12 ms).
+
+### Trying `autovideosink`
+
+```bash
+# Try autovideosink (works on a real monitor; risky over RDP)
+VSINK=autovideosink DISPLAY_VIEW=1 LEAKY=1 bash run_basler_pipeline.sh
+```
+
+Generated pipeline:
+
+```bash
+python3 /opt/basler_reader.py --geometry 1920x1080@60 --pixel-format uyvy \
+  | gst-launch-1.0 \
+    fdsrc fd=0 blocksize=4147200 do-timestamp=true ! \
+    rawvideoparse format=yuy2 width=1920 height=1080 framerate=60/1 ! \
+    vapostproc ! "video/x-raw(memory:VAMemory),format=NV12" ! \
+    identity eos-after=3000 ! \
+    queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
+    gvadetect model=/models/yolo11n_polyp/best_openvino_model/best.xml device=GPU threshold=0.5 \
+      pre-process-backend=va-surface-sharing nireq=1 ie-config=PERFORMANCE_HINT=LATENCY ! \
+    queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream ! \
+    gvawatermark ! gvafpscounter interval=1 ! \
+    vapostproc ! "video/x-raw" ! videoconvert ! autovideosink sync=false
+```
+
+`autovideosink` is an **auto-selector**, not a sink itself \u2014 it picks the best
+available sink at runtime (`glimagesink` \u2192 `xvimagesink` \u2192 `ximagesink`).
+
+| Environment | picks | result |
+|-------------|-------|--------|
+| **Real HDMI/DP monitor** | `glimagesink` (GPU/GL) | \u2705 best \u2014 zero-copy, lowest latency |
+| **RDP** | `glimagesink`/`xvimagesink` | \u274c usually black / stuck (no GL/Xv over RDP) |
+
+> Over RDP prefer `VSINK=ximagesink` (software, RDP-safe). Use `autovideosink`
+> (or `glimagesink`) only on a physical display. On a real monitor the trailing
+> `vapostproc ! videoconvert` download is unnecessary \u2014 `glimagesink` can take
+> the GPU surface directly.
+
+**Measured with `autovideosink` (hardware sink selected), LEAKY=1, 3000 frames:**
+
+```
+element               samples   mean_ms   p99_ms
+------------------------------------------------
+gvadetect0               2920    10.315   15.359 *
+gvawatermarkimpl0        2999     0.054    0.123 *
+gvafpscounter0           2999     0.024    0.068 *
+rawvideoparse0           3000     3.960    6.320
+vapostproc0              3000     4.328    6.152
+videoconvert0            2999     0.010    0.032   <- ~0 (HW sink, no SW convert)
+------------------------------------------------
+compute critical path (gva* sum)          10.393 ms
+CAMERA-TO-SCREEN (fdsrc->display) mean    12.910 ms
+CAMERA-TO-SCREEN (fdsrc->display) p50/p99   16.41 / 20.37 ms
+```
+
+Camera-to-screen is **12.9 ms** here vs **33 ms** with software `ximagesink` \u2014
+because `autovideosink` selected a hardware sink, so the ~12 ms `videoconvert`
+collapses to ~0. This is the recommended display path **when a real GPU/GL
+display is available**.
+
 ---
 
 ## 5. Latency (measured)
