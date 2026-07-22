@@ -47,13 +47,13 @@ GROUP_ARGS=()
 if [[ -n "${RENDER_GID}" ]]; then GROUP_ARGS+=(--group-add "${RENDER_GID}"); fi
 if [[ -n "${VIDEO_GID}" ]]; then GROUP_ARGS+=(--group-add "${VIDEO_GID}"); fi
 
-PIPELINE="gst-launch-1.0 -v \
+PIPELINE="gst-launch-1.0  \
   filesrc location=/videos/polyp_test.mp4 ! qtdemux ! h264parse ! vah264dec ! \
   \"video/x-raw(memory:VAMemory)\" ! \
   identity sync=true eos-after=${FRAMES} ! \
   queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! \
   gvadetect model=/models/yolo11n_polyp/best_openvino_model/best.xml device=GPU threshold=0.5 \
-    pre-process-backend=va-surface-sharing ${SCALE_OPT} nireq=2 ie-config=PERFORMANCE_HINT=LATENCY ! \
+    pre-process-backend=va-surface-sharing ${SCALE_OPT} nireq=1 ie-config=PERFORMANCE_HINT=LATENCY ! \
   queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! \
   gvawatermark ! gvafpscounter interval=1 ! \
   fakesink sync=false async=false"
