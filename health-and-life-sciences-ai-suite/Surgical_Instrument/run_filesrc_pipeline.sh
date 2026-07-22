@@ -36,6 +36,18 @@ FRAMES="${FRAMES:-3000}"
 SCALE_METHOD="${SCALE_METHOD:-}"
 SCALE_OPT=""
 if [[ -n "${SCALE_METHOD}" ]]; then SCALE_OPT="scale-method=${SCALE_METHOD} "; fi
+# DISPLAY_VIEW=1 -> render to a live window (needs X11 / RDP GUI) instead of
+# fakesink. LEAKY=1 -> newest-frame-wins queues (bounds latency under a slow
+# sink; recommended with DISPLAY_VIEW). VSINK overrides the display sink
+# (ximagesink is RDP-safe; use glimagesink on a real monitor).
+DISPLAY_VIEW="${DISPLAY_VIEW:-0}"
+LEAKY="${LEAKY:-0}"
+VSINK="${VSINK:-ximagesink}"
+if [[ "${LEAKY}" == "1" ]]; then
+  QUEUE="queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream"
+else
+  QUEUE="queue max-size-buffers=2 max-size-bytes=0 max-size-time=0"
+fi
 
 mkdir -p "${LOG_DIR}"
 cd "${ROOT_DIR}"
@@ -47,19 +59,35 @@ GROUP_ARGS=()
 if [[ -n "${RENDER_GID}" ]]; then GROUP_ARGS+=(--group-add "${RENDER_GID}"); fi
 if [[ -n "${VIDEO_GID}" ]]; then GROUP_ARGS+=(--group-add "${VIDEO_GID}"); fi
 
+# Sink tail: live display window (DISPLAY_VIEW=1) or fakesink (measure).
+DISPLAY_ARGS=()
+if [[ "${DISPLAY_VIEW}" == "1" ]]; then
+  if [[ -z "${DISPLAY:-}" ]]; then
+    echo "DISPLAY is empty. Run DISPLAY_VIEW=1 from the desktop / RDP GUI terminal."
+    exit 1
+  fi
+  xhost +local:docker >/dev/null 2>&1 || { echo "xhost failed for DISPLAY=${DISPLAY}"; exit 1; }
+  # Download VAMemory -> system before an X sink (X sinks can't take VA surfaces).
+  SINK_TAIL="gvawatermark ! gvafpscounter interval=1 ! vapostproc ! \"video/x-raw\" ! videoconvert ! ${VSINK} sync=false"
+  MODE_DESC="DISPLAY (live ${VSINK} window)"
+  DISPLAY_ARGS=(-e DISPLAY="${DISPLAY}" -e XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}" -v /tmp/.X11-unix:/tmp/.X11-unix:rw)
+else
+  SINK_TAIL="gvawatermark ! gvafpscounter interval=1 ! fakesink sync=false async=false"
+  MODE_DESC="MEASURE (fakesink)"
+fi
+
 PIPELINE="gst-launch-1.0  \
   filesrc location=/videos/polyp_test.mp4 ! qtdemux ! h264parse ! vah264dec ! \
   \"video/x-raw(memory:VAMemory)\" ! \
   identity sync=true eos-after=${FRAMES} ! \
-  queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! \
+  ${QUEUE} ! \
   gvadetect model=/models/yolo11n_polyp/best_openvino_model/best.xml device=GPU threshold=0.5 \
     pre-process-backend=va-surface-sharing ${SCALE_OPT} nireq=1 ie-config=PERFORMANCE_HINT=LATENCY ! \
-  queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! \
-  gvawatermark ! gvafpscounter interval=1 ! \
-  fakesink sync=false async=false"
+  ${QUEUE} ! \
+  ${SINK_TAIL}"
 
 echo "============================================================"
-echo "MODE: BEST (va-surface-sharing + LATENCY hint + paced, no leak)"
+echo "MODE:   ${MODE_DESC}  [leaky=${LEAKY}]"
 echo "IMAGE:  ${IMAGE}"
 echo "FRAMES: ${FRAMES}"
 echo "LOG:    ${LOG_FILE}"
@@ -68,9 +96,10 @@ echo "${PIPELINE}"
 echo "============================================================"
 
 docker run --rm --entrypoint bash --net=host \
-  -e 'GST_TRACERS=latency(flags=pipeline)' \
+  -e 'GST_TRACERS=latency(flags=pipeline+element)' \
   -e GST_DEBUG=GST_TRACER:7 \
   -e GST_DEBUG_NO_COLOR=1 \
+  "${DISPLAY_ARGS[@]}" \
   -v "${ROOT_DIR}/models:/models:ro" \
   -v "${ROOT_DIR}/videos:/videos:ro" \
   --device /dev/dri:/dev/dri \

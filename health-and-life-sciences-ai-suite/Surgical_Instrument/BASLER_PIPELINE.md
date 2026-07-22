@@ -107,14 +107,29 @@ accepts them directly.
 | `W` / `H` / `FPS` | 1920 / 1080 / 60 | geometry |
 | `FRAMES` | 3000 | stop after N frames |
 | `NIREQ` | 1 | inference requests in flight |
+| `LEAKY` | 0 | 1 → `leaky=downstream max-size-buffers=1 max-size-time=16000000` (newest-frame-wins; bounds latency under a slow sink) |
 | `RECORD` | 0 | 1 → save `.avi` |
 | `DISPLAY_VIEW` | 0 | 1 → live window |
 | `VSINK` | `ximagesink` | display sink (RDP-safe default) |
 | `OUT_AVI` | `/videos/basler_output.avi` | record path (container-side) |
 
+Every run prints a per-element table plus:
+- `compute critical path (gva* sum)` — inference + watermark only.
+- `E2E PIPELINE (fdsrc->fakesink)` in MEASURE mode, or
+  `CAMERA-TO-SCREEN (fdsrc->display)` in DISPLAY mode (the sink is a real display).
+
 Examples:
 ```bash
-DISPLAY_VIEW=1 FRAMES=6000 bash run_basler_pipeline.sh
+# Measure pipeline latency (fakesink)
+bash run_basler_pipeline.sh
+
+# Live view, freshest-frame-wins (recommended for a live feed)
+DISPLAY_VIEW=1 LEAKY=1 FRAMES=3000 bash run_basler_pipeline.sh
+
+# Live view, keep every frame (shows backlog under a slow RDP sink)
+DISPLAY_VIEW=1 LEAKY=0 FRAMES=3000 bash run_basler_pipeline.sh
+
+# Record an annotated clip
 SERIAL=40067928 RECORD=1 FRAMES=1200 bash run_basler_pipeline.sh
 ```
 
@@ -122,20 +137,54 @@ SERIAL=40067928 RECORD=1 FRAMES=1200 bash run_basler_pipeline.sh
 
 ## 5. Latency (measured)
 
-Per-element `latency(flags=element)` trace, summed over the compute path.
-Camera self-paced, so no pacing artifact.
+Three numbers matter, at increasing scope:
+
+| Metric | Value | Scope |
+|--------|------:|-------|
+| Model inference (`benchmark_app`) | **4.46 ms** / 224 FPS | model only, no GStreamer |
+| Compute critical path (`gva*` sum) | **~11 ms** | inference + watermark |
+| E2E pipeline (`fdsrc → fakesink`) | **~13–16 ms** | whole graph, no display |
+
+Per-element (MEASURE mode, camera self-paced, `flags=pipeline+element`):
 
 | Stage | mean ms | note |
 |-------|--------:|------|
-| vapostproc0 (UYVY→NV12) | ~4.0 | real per-frame input convert |
-| gvadetect0 | ~8.6 | preprocess + inference + parse |
+| rawvideoparse0 | ~2–4 | camera frame arrival (pacing, **not** compute) |
+| vapostproc0 (UYVY→NV12) | ~2–3 | real per-frame GPU input convert |
+| gvadetect0 | ~8–11 | preprocess + inference + YOLO parse |
 | gvawatermark | ~0.05 | cheap (few boxes in bench scene) |
-| **Live compute total** | **~12–13** | camera-to-annotated-frame |
 
-Pure model inference (OpenVINO `benchmark_app`, no GStreamer): **4.46 ms /
-224 FPS**. The rest of `gvadetect` is preprocess + YOLO output parsing.
+### Leaky vs non-leaky — DISPLAY mode over RDP (3000 frames)
 
-> `rawvideoparse` (~4 ms) is frame-arrival pacing, **not** compute — excluded.
+`leaky=downstream` (`LEAKY=1`) drops stale frames instead of letting them pile
+up behind a slow sink. Measured with the live camera → `ximagesink` over RDP:
+
+| Metric | `LEAKY=0` | `LEAKY=1` | Δ |
+|--------|----------:|----------:|----:|
+| **camera-to-screen mean** | **72.30 ms** | **33.03 ms** | **−54 %** |
+| camera-to-screen p50 | 68.71 | 34.71 | −49 % |
+| camera-to-screen p99 | 110.19 | 43.95 | −60 % |
+| `queue1` (pre-sink backlog) | 40.77 | 8.01 | frames dropped, not queued |
+| `queue0` | 12.59 | 0.08 | relieved |
+
+**Takeaway:** for a **live feed**, `LEAKY=1` is the correct choice — it roughly
+**halves** camera-to-screen latency and tames the p99, at the cost of dropping
+stale frames (freshest-frame-wins). For pure **throughput/measurement** (process
+every frame) leave `LEAKY=0`.
+
+> Of the ~33 ms leaky camera-to-screen, ~12 ms is `videoconvert` (NV12→RGB for
+> **software** `ximagesink`) — an **RDP-only** cost. On a real HDMI monitor with
+> a hardware/GL sink that ~12 ms + the network path largely vanish, so
+> camera-to-screen drops toward ~20 ms (still excluding sensor exposure + USB).
+
+### What these numbers do NOT include (glass-to-glass)
+
+The GStreamer tracer measures `fdsrc → sink` only. **True camera-to-screen
+(glass-to-glass) also includes** the sensor exposure/readout (~8–16 ms) and
+USB3 transfer (before `fdsrc`), plus the physical panel scanout (after the
+sink). Full glass-to-glass on a real monitor is therefore ~**35–50 ms**
+(consistent with the 39–55 ms medical-endoscope reference). Measuring that
+requires a physical **LED + high-speed-camera** test, not this tracer.
 
 ---
 
@@ -145,8 +194,7 @@ Pure model inference (OpenVINO `benchmark_app`, no GStreamer): **4.46 ms /
 |---------|-------|-----|
 | `no element gencamsrc` | plugin not in image | expected — we use the pypylon bridge |
 | Display "stuck", no window | `autovideosink` picks Xv/GL which fail over RDP | default `VSINK=ximagesink` (already set) |
-| `DISPLAY is empty` | plain SSH shell | run from the RDP/desktop GUI terminal |
-| fps below 60 in bench | auto-exposure under dim office light | real scope light source is bright → hits 60 |
+| `DISPLAY is empty` | plain SSH shell | run from the RDP/desktop GUI terminal || live view laggy / high latency over RDP | frames pile up behind slow software `ximagesink` | use `LEAKY=1` (drops stale frames, ~2\u00d7 lower camera-to-screen); or use a real HDMI monitor + `VSINK=glimagesink` || fps below 60 in bench | auto-exposure under dim office light | real scope light source is bright → hits 60 |
 | `.avi` owned by root | Docker wrote it | `sudo chown $USER:$USER videos/basler_output.avi` |
 | camera not found | USB access / power | check `lsusb \| grep 2676` (Basler VID) |
 

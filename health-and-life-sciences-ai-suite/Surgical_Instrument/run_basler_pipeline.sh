@@ -43,6 +43,17 @@ NIREQ="${NIREQ:-1}"
 SERIAL="${SERIAL:-}"                 # empty = first detected camera
 RECORD="${RECORD:-0}"               # 1 = save annotated .avi instead of fakesink
 DISPLAY_VIEW="${DISPLAY_VIEW:-0}"    # 1 = live autovideosink window (needs X11)
+# LEAKY=1 -> queues drop the oldest frame when full (newest-frame-wins). This is
+# the RIGHT choice for a LIVE feed: bounds latency by dropping stale frames
+# instead of backing up behind a slow sink (e.g. RDP display). Off for pure
+# throughput/measurement (every frame processed).
+LEAKY="${LEAKY:-0}"
+if [[ "${LEAKY}" == "1" ]]; then
+  # newest-frame-wins: cap at 1 buffer AND ~1 frame of time (16 ms @ 60 fps).
+  QUEUE="queue max-size-buffers=1 max-size-bytes=0 max-size-time=16000000 leaky=downstream"
+else
+  QUEUE="queue max-size-buffers=2 max-size-bytes=0 max-size-time=0"
+fi
 OUT_AVI="${OUT_AVI:-/videos/basler_output.avi}"
 BLOCKSIZE=$(( W * H * 2 ))           # UYVY = 2 bytes/px
 
@@ -94,16 +105,16 @@ CMD="python3 /opt/basler_reader.py ${SERIAL} --geometry ${W}x${H}@${FPS} --pixel
     rawvideoparse format=yuy2 width=${W} height=${H} framerate=${FPS}/1 ! \
     vapostproc ! \"video/x-raw(memory:VAMemory),format=NV12\" ! \
     identity eos-after=${FRAMES} ! \
-    queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! \
+    ${QUEUE} ! \
     gvadetect model=/models/yolo11n_polyp/best_openvino_model/best.xml device=GPU threshold=0.5 \
       pre-process-backend=va-surface-sharing nireq=${NIREQ} ie-config=PERFORMANCE_HINT=LATENCY ! \
-    queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! \
+    ${QUEUE} ! \
     ${SINK_TAIL}"
 
 echo "============================================================"
 echo "MODE:    ${MODE_DESC}"
 echo "IMAGE:   ${IMAGE}"
-echo "CAMERA:  serial='${SERIAL:-<first>}'  ${W}x${H}@${FPS}  nireq=${NIREQ}"
+echo "CAMERA:  serial='${SERIAL:-<first>}'  ${W}x${H}@${FPS}  nireq=${NIREQ}  leaky=${LEAKY}"
 echo "FRAMES:  ${FRAMES}"
 echo "============================================================"
 echo "${CMD}"
@@ -130,22 +141,25 @@ if [[ "${RECORD}" == "1" ]]; then
   exit 0
 fi
 
+# MEASURE and DISPLAY both parse the trace. In DISPLAY mode the sink IS the real
+# display, so the whole-pipeline e2e is the closest camera-to-screen proxy we
+# can measure (fdsrc -> display). In MEASURE mode the sink is fakesink, so e2e
+# is pipeline-only.
 if [[ "${DISPLAY_VIEW}" == "1" ]]; then
-  echo
-  echo "Live display window closed."
-  exit 0
+  E2E_LABEL="CAMERA-TO-SCREEN (fdsrc->display)"
+else
+  E2E_LABEL="E2E PIPELINE (fdsrc->fakesink)"
 fi
 
 echo
-echo "===== LIVE CAMERA LATENCY ====="
-python3 - "${LOG_FILE}" "${TXT_FILE}" <<'PY'
+echo "===== LIVE CAMERA LATENCY  [leaky=${LEAKY}] ====="
+python3 - "${LOG_FILE}" "${TXT_FILE}" "${E2E_LABEL}" <<'PY'
 import re, sys, statistics
 
 log, txt_out = sys.argv[1], sys.argv[2]
+e2e_label = sys.argv[3] if len(sys.argv) > 3 else "E2E PIPELINE (fdsrc->sink)"
 COMPUTE_PREFIXES = ("gvadetect", "gvawatermark", "gvafpscounter")
 elem_re = re.compile(r"\selement-latency,.*element=\(string\)([^,]+),.*time=\(guint64\)(\d+)")
-# whole-pipeline record: "... latency, src-element-id=... time=(guint64)N ..."
-# (NOT "element-latency,"). This is fdsrc(source) -> sink end-to-end residency.
 pipe_re = re.compile(r"\s(?<!element-)latency,.*time=\(guint64\)(\d+)")
 
 per_elem = {}
@@ -185,10 +199,8 @@ lines.append("-" * 48)
 lines.append(f"{'compute critical path (gva* sum)':<38} {critical:>9.3f} ms")
 if e2e:
     mean, p50, p99 = stats(e2e)
-    lines.append(f"{'E2E PIPELINE (fdsrc->sink, mean)':<38} {mean:>9.3f} ms")
-    lines.append(f"{'E2E PIPELINE (p50 / p99)':<38} {p50:>9.3f} / {p99:.3f} ms")
-    lines.append("(E2E = whole-pipeline source->sink; camera self-paced so this is")
-    lines.append(" honest. Excludes sensor exposure/USB in + display scanout out.)")
+    lines.append(f"{e2e_label + ' mean':<38} {mean:>9.3f} ms")
+    lines.append(f"{e2e_label + ' p50/p99':<38} {p50:>7.2f} / {p99:.2f} ms")
 
 out = "\n".join(lines) + "\n"
 print(out, end="")
