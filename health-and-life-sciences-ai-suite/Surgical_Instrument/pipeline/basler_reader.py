@@ -42,6 +42,7 @@ respawns (if /start is still the user intent) or unwinds cleanly.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import signal
 import sys
@@ -64,6 +65,20 @@ def _parse_geometry(spec: str) -> tuple[int, int, int]:
             f"invalid geometry {spec!r} (want WxH@fps, e.g. 1920x1080@60)"
         )
     return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_float(name: str) -> float | None:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return None
+    return float(value)
 
 
 def _open_camera(serial: str | None) -> "pylon.InstantCamera":
@@ -104,6 +119,15 @@ def main() -> int:
                         "YUY2 modes were removed \u2014 pylon's converter can "
                         "only output RGB/BGR/Mono for Bayer-native models "
                         "like acA1920-150uc.")
+    p.add_argument("--fixed-camera", action="store_true",
+                   default=_env_flag("BASLER_FIXED_CAMERA"),
+                   help="Disable auto exposure/gain/white-balance and use fixed values. "
+                        "Can also be enabled with BASLER_FIXED_CAMERA=1.")
+    p.add_argument("--exposure-us", type=float, default=_env_float("BASLER_EXPOSURE_US"),
+                   help="Fixed exposure time in microseconds. Implies --fixed-camera. "
+                        "Can also be set with BASLER_EXPOSURE_US.")
+    p.add_argument("--gain", type=float, default=_env_float("BASLER_GAIN"),
+                   help="Fixed analog gain. Implies --fixed-camera. Can also be set with BASLER_GAIN.")
     args = p.parse_args()
     w, h, fps = args.geometry if isinstance(args.geometry, tuple) \
         else _parse_geometry(args.geometry)
@@ -122,6 +146,8 @@ def main() -> int:
 
     _try_set("Width",  w)
     _try_set("Height", h)
+    _try_set("AcquisitionMode", "Continuous")
+    _try_set("TriggerMode", "Off")
     _try_set("AcquisitionFrameRateEnable", True)
     _try_set("AcquisitionFrameRate", float(fps))
     # Some ace-U models expose the older AcquisitionFrameRateAbs.
@@ -137,13 +163,29 @@ def main() -> int:
     # exposure will always be short (µs range) — this cap only matters for
     # bench/demo use where the camera is pointed at ambient office lighting.
     max_exposure_us = max(1000, int(1_000_000 / (fps * 2)))  # ≈ 8 333 µs @60 fps
-    _try_set("ExposureAuto", "Continuous")
-    _try_set("AutoExposureTimeUpperLimit",     max_exposure_us)  # SFNC 2.x
-    _try_set("AutoExposureTimeAbsUpperLimit",  max_exposure_us)  # legacy alias
-    sys.stderr.write(
-        f"[basler_reader] target fps={fps} → AutoExposureTimeUpperLimit "
-        f"capped at {max_exposure_us} µs (≈ 1/{1_000_000 // max_exposure_us} s)\n"
-    )
+    fixed_camera = args.fixed_camera or args.exposure_us is not None or args.gain is not None
+    if fixed_camera:
+        exposure_us = args.exposure_us if args.exposure_us is not None else min(5000.0, float(max_exposure_us))
+        gain = args.gain if args.gain is not None else 0.0
+        _try_set("ExposureAuto", "Off")
+        _try_set("ExposureTime", exposure_us)
+        _try_set("ExposureTimeAbs", exposure_us)
+        _try_set("GainAuto", "Off")
+        _try_set("Gain", gain)
+        _try_set("GainRaw", int(gain))
+        _try_set("BalanceWhiteAuto", "Off")
+        sys.stderr.write(
+            f"[basler_reader] fixed camera mode: exposure={exposure_us:.1f} µs, "
+            f"gain={gain:.2f}, trigger=off, acquisition=continuous\n"
+        )
+    else:
+        _try_set("ExposureAuto", "Continuous")
+        _try_set("AutoExposureTimeUpperLimit",     max_exposure_us)  # SFNC 2.x
+        _try_set("AutoExposureTimeAbsUpperLimit",  max_exposure_us)  # legacy alias
+        sys.stderr.write(
+            f"[basler_reader] target fps={fps} → AutoExposureTimeUpperLimit "
+            f"capped at {max_exposure_us} µs (≈ 1/{1_000_000 // max_exposure_us} s)\n"
+        )
 
     # Output pixel format. Two paths:
     #

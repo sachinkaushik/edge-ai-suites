@@ -7,6 +7,14 @@ SHELL := /bin/bash
 # ---- Tunables (override on the CLI: `make up UI_HOST_PORT=9000`) -----------
 UI_HOST_PORT       ?= 8080
 DETECTION_DEVICE   ?= GPU
+PIPELINE_MINIMAL_DISPLAY ?= 0
+PIPELINE_CAMERA_CORES ?=
+PIPELINE_GST_CORES ?=
+PIPELINE_CAMERA_RT_PRIORITY ?=
+PIPELINE_GST_RT_PRIORITY ?=
+BASLER_FIXED_CAMERA ?= 0
+BASLER_EXPOSURE_US ?=
+BASLER_GAIN ?=
 COMPOSE            ?= docker compose
 # Render/video GIDs are auto-detected from the host so /dev/dri passthrough
 # works without editing this file. Override on the CLI if needed.
@@ -86,6 +94,10 @@ up:  ## First-boot: build images + start stack. May take 20-35 min if no cached 
 	@xhost +local:root >/dev/null 2>&1 || true
 	@$(MAKE) --no-print-directory _camera-override
 	UI_HOST_PORT=$(UI_HOST_PORT) DETECTION_DEVICE=$(DETECTION_DEVICE) \
+	PIPELINE_MINIMAL_DISPLAY=$(PIPELINE_MINIMAL_DISPLAY) \
+	PIPELINE_CAMERA_CORES=$(PIPELINE_CAMERA_CORES) PIPELINE_GST_CORES=$(PIPELINE_GST_CORES) \
+	PIPELINE_CAMERA_RT_PRIORITY=$(PIPELINE_CAMERA_RT_PRIORITY) PIPELINE_GST_RT_PRIORITY=$(PIPELINE_GST_RT_PRIORITY) \
+	BASLER_FIXED_CAMERA=$(BASLER_FIXED_CAMERA) BASLER_EXPOSURE_US=$(BASLER_EXPOSURE_US) BASLER_GAIN=$(BASLER_GAIN) \
 	RENDER_GID=$(RENDER_GID) VIDEO_GID=$(VIDEO_GID) \
 		$(COMPOSE) $(_COMPOSE_FILES) up -d --build
 	@echo "[up] First boot may take 20-35 min while YOLO11n trains on the iGPU."
@@ -101,6 +113,10 @@ run:  ## Fast subsequent boot: start stack without rebuild. Requires cached IR.
 	@xhost +local:root >/dev/null 2>&1 || true
 	@$(MAKE) --no-print-directory _camera-override
 	UI_HOST_PORT=$(UI_HOST_PORT) DETECTION_DEVICE=$(DETECTION_DEVICE) \
+	PIPELINE_MINIMAL_DISPLAY=$(PIPELINE_MINIMAL_DISPLAY) \
+	PIPELINE_CAMERA_CORES=$(PIPELINE_CAMERA_CORES) PIPELINE_GST_CORES=$(PIPELINE_GST_CORES) \
+	PIPELINE_CAMERA_RT_PRIORITY=$(PIPELINE_CAMERA_RT_PRIORITY) PIPELINE_GST_RT_PRIORITY=$(PIPELINE_GST_RT_PRIORITY) \
+	BASLER_FIXED_CAMERA=$(BASLER_FIXED_CAMERA) BASLER_EXPOSURE_US=$(BASLER_EXPOSURE_US) BASLER_GAIN=$(BASLER_GAIN) \
 	RENDER_GID=$(RENDER_GID) VIDEO_GID=$(VIDEO_GID) \
 		$(COMPOSE) $(_COMPOSE_FILES) up -d
 	$(_print_urls)

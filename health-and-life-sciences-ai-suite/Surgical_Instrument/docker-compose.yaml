@@ -50,6 +50,12 @@ services:
     group_add:
       - "${RENDER_GID:-992}"
       - "${VIDEO_GID:-44}"
+    cap_add:
+      - SYS_NICE
+    ulimits:
+      rtprio: 99
+      memlock: -1
+      nice: -20
     devices:
       - /dev/dri:/dev/dri
       - /dev/accel:/dev/accel
@@ -82,6 +88,14 @@ services:
       XAUTHORITY:  /root/.Xauthority
       PIPELINE_DISPLAY_VIEW: "1"
       PIPELINE_VIDEO_SINK: autovideosink
+      PIPELINE_MINIMAL_DISPLAY: ${PIPELINE_MINIMAL_DISPLAY:-0}
+      PIPELINE_CAMERA_CORES: ${PIPELINE_CAMERA_CORES:-}
+      PIPELINE_GST_CORES: ${PIPELINE_GST_CORES:-}
+      PIPELINE_CAMERA_RT_PRIORITY: ${PIPELINE_CAMERA_RT_PRIORITY:-}
+      PIPELINE_GST_RT_PRIORITY: ${PIPELINE_GST_RT_PRIORITY:-}
+      BASLER_FIXED_CAMERA: ${BASLER_FIXED_CAMERA:-0}
+      BASLER_EXPOSURE_US: ${BASLER_EXPOSURE_US:-}
+      BASLER_GAIN: ${BASLER_GAIN:-}
 
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health >/dev/null || exit 1"]

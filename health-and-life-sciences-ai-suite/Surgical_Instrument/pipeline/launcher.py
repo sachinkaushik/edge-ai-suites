@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -37,6 +38,11 @@ TARGET_FPS  = int(os.environ.get("TARGET_FPS", "60"))
 HTTP_PORT   = int(os.environ.get("PIPELINE_HTTP_PORT", "8000"))
 DISPLAY_VIEW = os.environ.get("PIPELINE_DISPLAY_VIEW", "1") == "1"
 VIDEO_SINK   = os.environ.get("PIPELINE_VIDEO_SINK", "autovideosink")
+MINIMAL_DISPLAY = os.environ.get("PIPELINE_MINIMAL_DISPLAY", "0") == "1"
+CAMERA_CORES = os.environ.get("PIPELINE_CAMERA_CORES", "").strip()
+GST_CORES = os.environ.get("PIPELINE_GST_CORES", "").strip()
+CAMERA_RT_PRIORITY = os.environ.get("PIPELINE_CAMERA_RT_PRIORITY", "").strip()
+GST_RT_PRIORITY = os.environ.get("PIPELINE_GST_RT_PRIORITY", "").strip()
 # 0 = unlimited (default for live demo). Set PIPELINE_FRAME_LIMIT=N to cap
 # at N frames — useful for benchmarking runs that should auto-terminate.
 FRAME_LIMIT  = int(os.environ.get("PIPELINE_FRAME_LIMIT", "0"))
@@ -69,6 +75,16 @@ def _reap_if_dead() -> None:
         _proc = None
 
 
+def _wrap_scheduler(command: str, *, cores: str = "", rt_priority: str = "") -> str:
+    """Prefix a shell command with optional taskset/chrt controls."""
+    parts: list[str] = []
+    if cores:
+        parts += ["taskset", "-c", shlex.quote(cores)]
+    if rt_priority:
+        parts += ["chrt", "-f", shlex.quote(rt_priority)]
+    return " ".join(parts + [command])
+
+
 def _spawn(
     device: str,
     source_kind: str,
@@ -90,6 +106,7 @@ def _spawn(
         frame_limit=FRAME_LIMIT,
         display_view=use_display,
         video_sink=VIDEO_SINK,
+        minimal_display=MINIMAL_DISPLAY,
     )
 
     env = os.environ.copy()
@@ -115,13 +132,28 @@ def _spawn(
             )
         except Exception as _exc:  # noqa: BLE001
             log.warning("[basler] pypylon enumeration failed: %s", _exc)
+        camera_cmd = _wrap_scheduler(
+            f"python3 /opt/basler_reader.py {shlex.quote(source_arg)} "
+            f"--geometry 1920x1080@{TARGET_FPS} --pixel-format uyvy",
+            cores=CAMERA_CORES,
+            rt_priority=CAMERA_RT_PRIORITY,
+        )
+        gst_cmd = _wrap_scheduler(
+            f"gst-launch-1.0 {pipeline}",
+            cores=GST_CORES,
+            rt_priority=GST_RT_PRIORITY,
+        )
         cmd = (
-            f"exec python3 /opt/basler_reader.py {source_arg} "
-            f"--geometry 1920x1080@{TARGET_FPS} --pixel-format uyvy "
-            f"| exec gst-launch-1.0 {pipeline}"
+            f"exec {camera_cmd} "
+            f"| exec {gst_cmd}"
         )
     else:
-        cmd = f"exec gst-launch-1.0 {pipeline}"
+        gst_cmd = _wrap_scheduler(
+            f"gst-launch-1.0 {pipeline}",
+            cores=GST_CORES,
+            rt_priority=GST_RT_PRIORITY,
+        )
+        cmd = f"exec {gst_cmd}"
 
     log.info("[pipeline] generated cmd: %s", cmd)
 

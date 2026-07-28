@@ -60,6 +60,7 @@ def build(
     frame_limit: int = 0,
     display_view: bool = False,
     video_sink: str = "ximagesink",
+    minimal_display: bool = False,
 ) -> str:
     """Return the finalized single-branch gst-launch pipeline string."""
     dev = device.upper()
@@ -99,14 +100,21 @@ def build(
         # playback runs at the encoded speed. Live sources (basler) keep
         # sync=false — they have no file clock and must render as frames arrive.
         sink_sync = "false" if source_kind == "basler" else "true"
-        sink_tail = [
-            "gvawatermark",
-            "gvafpscounter interval=1",
-            "vapostproc",
-            '"video/x-raw"',
-            "videoconvert",
-            f"{video_sink} sync={sink_sync}",
-        ]
+        if minimal_display:
+            sink_tail = [
+                "gvawatermark",
+                "vapostproc",
+                f"{video_sink} sync={sink_sync}",
+            ]
+        else:
+            sink_tail = [
+                "gvawatermark",
+                "gvafpscounter interval=1",
+                "vapostproc",
+                '"video/x-raw"',
+                "videoconvert",
+                f"{video_sink} sync={sink_sync}",
+            ]
     else:
         sink_tail = [
             "gvawatermark",
