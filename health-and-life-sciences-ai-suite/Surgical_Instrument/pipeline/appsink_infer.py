@@ -50,6 +50,15 @@ def _sink_sync(source_kind: str) -> str:
     return "false" if source_kind == "basler" else "true"
 
 
+def _parse_launch_element(element: str) -> str:
+    # pipeline_string.py quotes caps containing parentheses for gst-launch shell
+    # safety. Gst.parse_launch receives the string directly, so those shell-only
+    # quotes become syntax errors and must be removed here.
+    if len(element) >= 2 and element[0] == element[-1] == "'":
+        return element[1:-1]
+    return element
+
+
 def _caps_wh(caps: Gst.Caps) -> tuple[int, int]:
     st = caps.get_structure(0)
     ok_w, width = st.get_int("width")
@@ -70,7 +79,7 @@ def _build_pipeline() -> str:
         basler_exposure_us=BASLER_EXPOSURE_US or None,
         basler_gain=BASLER_GAIN or None,
     )
-    source_chain = list(source)
+    source_chain = [_parse_launch_element(element) for element in source]
     if SOURCE_KIND == "file":
         source_chain.extend(["vapostproc", "video/x-raw(memory:VAMemory),format=NV12"])
 

@@ -82,25 +82,29 @@ make up REGISTRY=false \
   TAG=appsink-dev \
   PIPELINE_BACKEND=appsink \
   SOURCE_KIND=basler \
-  SOURCE_ARG=40715749 \
+  SOURCE_ARG=40067928 \
   BASLER_PIXEL_FORMAT=ycbcr422_8 \
   PIPELINE_DISPLAY_VIEW=1 \
-  PIPELINE_VIDEO_SINK=xvimagesink \
+  PIPELINE_VIDEO_SINK=ximagesink \
   PIPELINE_SINK_SYNC=false
 ```
 
-Start the pipeline from the backend/API contract as usual:
+Use `ximagesink` for Ubuntu RDP/Xwayland sessions. On a physical X11 desktop,
+`xvimagesink` may be faster if XVideo is available.
+
+The `surgical-pipeline` control port is internal to the container network, so
+call it from inside the container for direct testing:
 
 ```bash
-curl -s -X POST http://localhost:8000/start \
-  -H 'Content-Type: application/json' \
-  -d '{"device":"GPU","source":{"kind":"basler","arg":"40715749"}}'
+docker exec surgical-pipeline sh -lc 'curl -s -X POST http://localhost:8000/start \
+  -H "Content-Type: application/json" \
+  -d "{\"device\":\"GPU\",\"source\":{\"kind\":\"basler\",\"arg\":\"40067928\"}}"'
 ```
 
 Stop it with:
 
 ```bash
-curl -s -X POST http://localhost:8000/stop
+docker exec surgical-pipeline sh -lc 'curl -s -X POST http://localhost:8000/stop'
 ```
 
 ## Run with file source
@@ -119,10 +123,14 @@ make up REGISTRY=false \
 Then start:
 
 ```bash
-curl -s -X POST http://localhost:8000/start \
-  -H 'Content-Type: application/json' \
-  -d '{"device":"GPU","source":{"kind":"file","arg":"/videos/polyp_test.mp4"}}'
+docker exec surgical-pipeline sh -lc 'curl -s -X POST http://localhost:8000/start \
+  -H "Content-Type: application/json" \
+  -d "{\"device\":\"GPU\",\"source\":{\"kind\":\"file\",\"arg\":\"/videos/polyp_test.mp4\"}}"'
 ```
+
+If you want to call the pipeline API from the host directly, publish port 8000
+in `docker-compose.yaml` first. In the default stack, only the UI port is
+published to the host.
 
 ## Direct container smoke test
 
@@ -155,7 +163,7 @@ FPS from this smoke test is not the live Basler acceptance metric.
 | `INFER_THRESHOLD` | `0.5` | Detection confidence threshold. |
 | `INFER_IOU` | `0.45` | NMS IoU threshold. |
 | `PIPELINE_DISPLAY_VIEW` | `0` | Set `1` for a live popup sink. |
-| `PIPELINE_VIDEO_SINK` | `autovideosink` | Use `xvimagesink` on the validated desktop path. |
+| `PIPELINE_VIDEO_SINK` | `autovideosink` | Use `ximagesink` for RDP/Xwayland; try `xvimagesink` on a physical X11 desktop. |
 | `PIPELINE_SINK_SYNC` | source-based | Use `false` for live Basler display testing. |
 | `BASLER_PIXEL_FORMAT` | `bayerbggr` | Use `ycbcr422_8` for the optimized Basler path. |
 
@@ -224,11 +232,13 @@ Do not request `RGB` directly from `vapostproc` in this image.
 ### No popup window
 
 Use `PIPELINE_DISPLAY_VIEW=1`, pass through `DISPLAY`, and mount
-`/tmp/.X11-unix`. On the validated Basler desktop path, prefer:
+`/tmp/.X11-unix`. For RDP/Xwayland, prefer:
 
 ```bash
-PIPELINE_VIDEO_SINK=xvimagesink PIPELINE_SINK_SYNC=false
+PIPELINE_VIDEO_SINK=ximagesink PIPELINE_SINK_SYNC=false
 ```
+
+On a physical X11 display, `xvimagesink` can be tested as a faster alternative.
 
 For headless validation, keep `PIPELINE_DISPLAY_VIEW=0`; the backend still runs
 with `fakesink`.
