@@ -31,6 +31,15 @@ OV_NIREQ = max(1, int(os.environ.get("OV_NIREQ", "4")))
 DISPLAY_VIEW = os.environ.get("PIPELINE_DISPLAY_VIEW", "0").strip().lower() in {"1", "true", "yes", "on"}
 VIDEO_SINK = os.environ.get("PIPELINE_VIDEO_SINK", "autovideosink")
 PIPELINE_SINK_SYNC = os.environ.get("PIPELINE_SINK_SYNC", "").strip().lower()
+# PIPELINE_DISPLAY_* are the public knob names; APPSINK_DISPLAY_* kept as fallback.
+APPSINK_DISPLAY_WIDTH = int(os.environ.get("PIPELINE_DISPLAY_WIDTH", os.environ.get("APPSINK_DISPLAY_WIDTH", "1280")))
+APPSINK_DISPLAY_HEIGHT = int(os.environ.get("PIPELINE_DISPLAY_HEIGHT", os.environ.get("APPSINK_DISPLAY_HEIGHT", "720")))
+APPSINK_DISPLAY_FORMAT = (os.environ.get("PIPELINE_DISPLAY_FORMAT", os.environ.get("APPSINK_DISPLAY_FORMAT", "BGRx")).strip() or "BGRx")
+# Inference-branch caps. Must be an aspect-correct downscale of the 16:9 source
+# (1280x720 -> 640x360) so the detector can letterbox-pad it to the square
+# model input (640x640) without distortion. Do NOT set this to 640x640.
+INFER_INPUT_WIDTH = int(os.environ.get("INFER_INPUT_WIDTH", "640"))
+INFER_INPUT_HEIGHT = int(os.environ.get("INFER_INPUT_HEIGHT", "360"))
 BASLER_PIXEL_FORMAT = os.environ.get("BASLER_PIXEL_FORMAT", "ycbcr422_8").strip() or "ycbcr422_8"
 BASLER_FIXED_CAMERA = os.environ.get("BASLER_FIXED_CAMERA", "0").strip().lower() not in {"0", "false", "no"}
 BASLER_EXPOSURE_US = os.environ.get("BASLER_EXPOSURE_US", "").strip()
@@ -59,6 +68,12 @@ def _parse_launch_element(element: str) -> str:
     return element
 
 
+def _fixate_basler_va_caps(element: str) -> str:
+    if SOURCE_KIND == "basler" and element == "video/x-raw(memory:VAMemory),format=NV12":
+        return "video/x-raw(memory:VAMemory),format=NV12,width=1280,height=720"
+    return element
+
+
 def _caps_wh(caps: Gst.Caps) -> tuple[int, int]:
     st = caps.get_structure(0)
     ok_w, width = st.get_int("width")
@@ -79,7 +94,7 @@ def _build_pipeline() -> str:
         basler_exposure_us=BASLER_EXPOSURE_US or None,
         basler_gain=BASLER_GAIN or None,
     )
-    source_chain = [_parse_launch_element(element) for element in source]
+    source_chain = [_fixate_basler_va_caps(_parse_launch_element(element)) for element in source]
     if SOURCE_KIND == "file":
         source_chain.extend(["vapostproc", "video/x-raw(memory:VAMemory),format=NV12"])
 
@@ -88,9 +103,8 @@ def _build_pipeline() -> str:
         "t.",
         "queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 leaky=downstream",
         "vapostproc",
-        "video/x-raw,format=BGRx",
+        f"video/x-raw,format={APPSINK_DISPLAY_FORMAT},width={APPSINK_DISPLAY_WIDTH},height={APPSINK_DISPLAY_HEIGHT}",
         "cairooverlay name=overlay",
-        "videoconvert",
         "gvafpscounter interval=1",
         sink,
     ])
@@ -98,9 +112,7 @@ def _build_pipeline() -> str:
         "t.",
         "queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream",
         "vapostproc",
-        "video/x-raw,format=BGRx,width=640,height=640",
-        "videoconvert",
-        "video/x-raw,format=RGB,width=640,height=640",
+        f"video/x-raw,format=BGRx,width={INFER_INPUT_WIDTH},height={INFER_INPUT_HEIGHT}",
         "appsink name=infer emit-signals=true drop=true max-buffers=1 sync=false",
     ])
     return " ! ".join(source_chain + ["tee name=t"]) + f" {display_branch} {infer_branch}"
@@ -124,7 +136,9 @@ def _on_new_sample(sink: Gst.Element) -> Gst.FlowReturn:
     if not ok:
         return Gst.FlowReturn.OK
     try:
-        frame = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape(height, width, 3).copy()
+        # BGRx is 4 bytes/px; at any width the row length is 4-byte aligned so
+        # GStreamer adds no row padding — a flat reshape is safe.
+        frame = np.frombuffer(mapinfo.data, dtype=np.uint8).reshape(height, width, 4).copy()
     finally:
         buf.unmap(mapinfo)
     counts["samples"] += 1
@@ -140,6 +154,8 @@ def _on_draw(_overlay, cr, _timestamp: int, _duration: int) -> None:  # noqa: AN
         return
     cr.set_source_rgb(0.0, 1.0, 0.0)
     cr.set_line_width(2.0)
+    cr.select_font_face("sans")
+    cr.set_font_size(16.0)
     for box in boxes:
         cr.rectangle(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1)
         cr.stroke()
@@ -184,6 +200,23 @@ def _report() -> bool:
     return True
 
 
+def _pinning_status() -> str:
+    # Report the affinity/scheduler this process actually inherited from the
+    # launcher's taskset/chrt prefix (env vars are the requested values).
+    try:
+        cores = sorted(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        cores = []
+    policy_names = {0: "OTHER", 1: "FIFO", 2: "RR", 3: "BATCH", 5: "IDLE", 6: "DEADLINE"}
+    try:
+        policy = policy_names.get(os.sched_getscheduler(0), "?")
+        prio = os.sched_getparam(0).sched_priority
+    except (AttributeError, OSError):
+        policy, prio = "?", "?"
+    cores_str = ",".join(str(c) for c in cores) if cores else "<all>"
+    return f"cores={cores_str} sched={policy} priority={prio}"
+
+
 def main() -> int:
     global detector, loop
     Gst.init(None)
@@ -196,6 +229,10 @@ def main() -> int:
         on_result=_on_infer_result,
     )
     pipeline_str = _build_pipeline()
+    log.info("[appsink] core-pinning: %s (requested PIPELINE_GST_CORES=%s PIPELINE_GST_RT_PRIORITY=%s)",
+             _pinning_status(),
+             os.environ.get("PIPELINE_GST_CORES", "").strip() or "<unset>",
+             os.environ.get("PIPELINE_GST_RT_PRIORITY", "").strip() or "<unset>")
     log.info("[appsink] generated pipeline: %s", pipeline_str)
     pipeline = Gst.parse_launch(pipeline_str)
     infer = pipeline.get_by_name("infer")

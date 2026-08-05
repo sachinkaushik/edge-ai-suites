@@ -183,12 +183,12 @@ def _spawn(
         except Exception as _exc:  # noqa: BLE001
             log.warning("[basler] pypylon enumeration failed: %s", _exc)
         if PIPELINE_BACKEND == "appsink":
-            cmd = "exec python3 /opt/appsink_infer.py"
+            cmd = f"exec {gst_exec}python3 /opt/appsink_infer.py"
         else:
             cmd = f"exec {gst_exec}gst-launch-1.0 {pipeline}"
     else:
         if PIPELINE_BACKEND == "appsink":
-            cmd = "exec python3 /opt/appsink_infer.py"
+            cmd = f"exec {gst_exec}python3 /opt/appsink_infer.py"
         else:
             cmd = f"exec gst-launch-1.0 {pipeline}"
 

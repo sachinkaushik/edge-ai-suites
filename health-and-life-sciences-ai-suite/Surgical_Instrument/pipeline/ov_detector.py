@@ -83,6 +83,13 @@ class OpenVINODetector:
         if len(shape) != 4:
             raise ValueError(f"expected NCHW model input, got {shape}")
         _, _, self.input_h, self.input_w = (int(v) for v in shape)
+        # Letterbox bookkeeping (constant once the first real frame is seen).
+        # The infer branch delivers an aspect-correct downscale (e.g. 640x360)
+        # which _preprocess pads to the square model input (e.g. 640x640).
+        self._content_w = self.input_w
+        self._content_h = self.input_h
+        self._pad_x = 0
+        self._pad_y = 0
         self._queue = ov.AsyncInferQueue(compiled, max(1, nireq))
         self._queue.set_callback(self._on_complete)
         log.info("[appsink] OpenVINO compiled device=%s input=%s nireq=%s", device.upper(), shape, nireq)
@@ -97,11 +104,11 @@ class OpenVINODetector:
             "dropped_busy": self._dropped_busy,
         }
 
-    def submit(self, frame_rgb: np.ndarray, meta: FrameMeta) -> bool:
+    def submit(self, frame_bgrx: np.ndarray, meta: FrameMeta) -> bool:
         if not self._free.acquire(blocking=False):
             self._dropped_busy += 1
             return False
-        blob = self._preprocess(frame_rgb)
+        blob = self._preprocess(frame_bgrx)
         self._submitted += 1
         try:
             self._queue.start_async({self._input: blob}, userdata=meta)
@@ -123,10 +130,27 @@ class OpenVINODetector:
         finally:
             pass
 
-    def _preprocess(self, frame_rgb: np.ndarray) -> np.ndarray:
-        if frame_rgb.shape[0] != self.input_h or frame_rgb.shape[1] != self.input_w:
-            raise ValueError(f"appsink delivered {frame_rgb.shape[:2]}, expected {(self.input_h, self.input_w)}")
-        chw = frame_rgb.astype(np.float32) / 255.0
+    def _preprocess(self, frame_bgrx: np.ndarray) -> np.ndarray:
+        h, w = int(frame_bgrx.shape[0]), int(frame_bgrx.shape[1])
+        if w > self.input_w or h > self.input_h:
+            raise ValueError(
+                f"appsink delivered {(h, w)} which exceeds model input "
+                f"{(self.input_h, self.input_w)}; the infer branch must emit an "
+                f"aspect-correct downscale that fits the square model input "
+                f"(e.g. 640x360 for a 640x640 model)."
+            )
+        # BGRx -> RGB: drop alpha and swap B/R in one vectorized slice.
+        rgb = frame_bgrx[:, :, [2, 1, 0]]
+        # Letterbox: centre-pad the aspect-correct frame into the square model
+        # input with the standard gray (114) fill, matching the export-time
+        # preprocessing so detection accuracy is preserved.
+        pad_x = (self.input_w - w) // 2
+        pad_y = (self.input_h - h) // 2
+        canvas = np.full((self.input_h, self.input_w, 3), 114, dtype=np.uint8)
+        canvas[pad_y:pad_y + h, pad_x:pad_x + w] = rgb
+        self._content_w, self._content_h = w, h
+        self._pad_x, self._pad_y = pad_x, pad_y
+        chw = canvas.astype(np.float32) / 255.0
         return np.ascontiguousarray(chw.transpose(2, 0, 1)[None])
 
     def _on_complete(self, request, userdata) -> None:  # noqa: ANN001
@@ -164,8 +188,14 @@ class OpenVINODetector:
         xyxy[:, 1] = boxes_cxcywh[:, 1] - boxes_cxcywh[:, 3] / 2
         xyxy[:, 2] = boxes_cxcywh[:, 0] + boxes_cxcywh[:, 2] / 2
         xyxy[:, 3] = boxes_cxcywh[:, 1] + boxes_cxcywh[:, 3] / 2
-        xyxy[:, [0, 2]] *= display_width / float(self.input_w)
-        xyxy[:, [1, 3]] *= display_height / float(self.input_h)
+        # Undo the letterbox padding (square model space -> content space)...
+        xyxy[:, [0, 2]] -= self._pad_x
+        xyxy[:, [1, 3]] -= self._pad_y
+        # ...then map content space -> display space. Both the content frame and
+        # the display frame are pure downscales of the same source, so a plain
+        # ratio is exact.
+        xyxy[:, [0, 2]] *= display_width / float(self._content_w)
+        xyxy[:, [1, 3]] *= display_height / float(self._content_h)
         xyxy[:, [0, 2]] = np.clip(xyxy[:, [0, 2]], 0, display_width - 1)
         xyxy[:, [1, 3]] = np.clip(xyxy[:, [1, 3]], 0, display_height - 1)
 

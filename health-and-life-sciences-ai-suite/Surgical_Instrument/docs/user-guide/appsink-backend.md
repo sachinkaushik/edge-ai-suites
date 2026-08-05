@@ -86,11 +86,46 @@ make up REGISTRY=false \
   BASLER_PIXEL_FORMAT=ycbcr422_8 \
   PIPELINE_DISPLAY_VIEW=1 \
   PIPELINE_VIDEO_SINK=ximagesink \
-  PIPELINE_SINK_SYNC=false
+  PIPELINE_SINK_SYNC=false \
+  PIPELINE_GST_CORES=0-4 \
+  PIPELINE_GST_RT_PRIORITY=70
 ```
 
 Use `ximagesink` for Ubuntu RDP/Xwayland sessions. On a physical X11 desktop,
 `xvimagesink` may be faster if XVideo is available.
+
+`PIPELINE_GST_CORES` / `PIPELINE_GST_RT_PRIORITY` pin the pipeline process to a
+fixed CPU set with `taskset` and give it `SCHED_FIFO` real-time priority via
+`chrt`. Both must be set together. Run `make show-cores` to print the P-core set.
+
+### Optional: smoother display over RDP
+
+The display branch renders at native `1280x720` by default for best image
+quality. Over RDP the visible framerate is limited by the software X11/remote
+transport, not by capture or inference. If you need a smoother popup over RDP
+specifically, downscale only the display branch — the inference branch keeps its
+full model input resolution, so detection accuracy is unaffected:
+
+```bash
+make up REGISTRY=false \
+  TAG=appsink-dev \
+  PIPELINE_BACKEND=appsink \
+  SOURCE_KIND=basler \
+  SOURCE_ARG=40067928 \
+  BASLER_PIXEL_FORMAT=ycbcr422_8 \
+  PIPELINE_DISPLAY_VIEW=1 \
+  PIPELINE_VIDEO_SINK=ximagesink \
+  PIPELINE_SINK_SYNC=false \
+  PIPELINE_DISPLAY_WIDTH=640 \
+  PIPELINE_DISPLAY_HEIGHT=360 \
+  PIPELINE_DISPLAY_FORMAT=BGRx \
+  PIPELINE_GST_CORES=0-4 \
+  PIPELINE_GST_RT_PRIORITY=70
+```
+
+The display-size knobs only change the popup/render branch. The inference branch
+continues to use the model input size, so this reduces RDP/X bandwidth without
+lowering OpenVINO input resolution.
 
 The `surgical-pipeline` control port is internal to the container network, so
 call it from inside the container for direct testing:
@@ -165,6 +200,12 @@ FPS from this smoke test is not the live Basler acceptance metric.
 | `PIPELINE_DISPLAY_VIEW` | `0` | Set `1` for a live popup sink. |
 | `PIPELINE_VIDEO_SINK` | `autovideosink` | Use `ximagesink` for RDP/Xwayland; try `xvimagesink` on a physical X11 desktop. |
 | `PIPELINE_SINK_SYNC` | source-based | Use `false` for live Basler display testing. |
+| `APPSINK_DISPLAY_WIDTH` | `1280` | Alias for `PIPELINE_DISPLAY_WIDTH` (backward compatible). |
+| `PIPELINE_DISPLAY_WIDTH` | `1280` | Popup branch width. Use `640` for faster RDP display. |
+| `PIPELINE_DISPLAY_HEIGHT` | `720` | Popup branch height. Use `360` for faster RDP display. |
+| `PIPELINE_DISPLAY_FORMAT` | `BGRx` | Popup branch format. `BGRx` is the validated format for `cairooverlay`. |
+| `PIPELINE_GST_CORES` | unset | Pin pipeline to these CPUs via `taskset` (e.g. `0-4`). Requires `PIPELINE_GST_RT_PRIORITY`. |
+| `PIPELINE_GST_RT_PRIORITY` | unset | `SCHED_FIFO` priority via `chrt` (e.g. `70`). Requires `PIPELINE_GST_CORES`. |
 | `BASLER_PIXEL_FORMAT` | `bayerbggr` | Use `ycbcr422_8` for the optimized Basler path. |
 
 ## How to verify the backend is active
