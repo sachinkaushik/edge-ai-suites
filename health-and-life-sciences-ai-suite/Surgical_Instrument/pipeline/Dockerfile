@@ -26,6 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       git \
       gnupg \
       gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+      libcairo2-dev \
+    python3-gi \
+    python3-gi-cairo \
+      pkg-config \
       libgstreamer-plugins-base1.0-dev \
       libgstreamer1.0-dev \
       libusb-1.0-0 \
@@ -34,19 +39,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/* \
  && pip install --no-cache-dir --retries 4 --timeout 60 \
       flask==3.0.3 \
+      numpy==2.2.6 \
+      pycairo==1.27.0 \
       pypylon==4.0.0
+
+RUN gst-inspect-1.0 cairooverlay >/dev/null
 
 RUN cd /tmp \
  && wget -q https://downloads-ctf.baslerweb.com/dg51pdwahxgw/16EbjATpV78LtOFUQ1VpJM/ab3db40227afb59df3eb1cccf0c5addc/pylon-7.5.0.15658-linux-x86_64_debs.tar.gz \
  && tar -xzf pylon-7.5.0.15658-linux-x86_64_debs.tar.gz \
  && rm pylon-7.5.0.15658-linux-x86_64_debs.tar.gz \
- && dpkg -i pylon_7.5.0.15658-deb0_amd64.deb || apt-get update && apt-get install -fy \
+ && (dpkg -i pylon_7.5.0.15658-deb0_amd64.deb || (apt-get update && apt-get install -fy)) \
  && rm -f /tmp/pylon_7.5.0.15658-deb0_amd64.deb \
  && rm -rf /var/lib/apt/lists/*
 
 RUN cd /tmp \
- && wget -q https://github.com/basler/gst-plugin-pylon/releases/download/v1.0.0/gst-plugin-pylon_1.0.0-1.ubuntu-24.04_amd64.deb \
- && dpkg -i gst-plugin-pylon_1.0.0-1.ubuntu-24.04_amd64.deb || apt-get update && apt-get install -fy \
+ && wget --no-check-certificate -q https://github.com/basler/gst-plugin-pylon/releases/download/v1.0.0/gst-plugin-pylon_1.0.0-1.ubuntu-24.04_amd64.deb \
+ && (dpkg -i gst-plugin-pylon_1.0.0-1.ubuntu-24.04_amd64.deb || (apt-get update && apt-get install -fy)) \
  && rm -f /tmp/gst-plugin-pylon_1.0.0-1.ubuntu-24.04_amd64.deb \
  && rm -rf /var/lib/apt/lists/*
 
@@ -68,6 +77,9 @@ COPY latency_tracer_sink.py /opt/latency_tracer_sink.py
 COPY bbox_filter.py         /opt/bbox_filter.py
 COPY watermark_green.py     /opt/watermark_green.py
 COPY basler_reader.py       /opt/basler_reader.py
+COPY appsink_infer.py       /opt/appsink_infer.py
+COPY ov_detector.py         /opt/ov_detector.py
+COPY overlay_state.py       /opt/overlay_state.py
 
 ENV PIPELINE_HTTP_PORT=8000
 

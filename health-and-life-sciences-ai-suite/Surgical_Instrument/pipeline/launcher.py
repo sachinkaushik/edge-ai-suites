@@ -52,6 +52,7 @@ IDENTITY_ENABLED = os.environ.get("PIPELINE_IDENTITY", "0").strip().lower() not 
 MINIMAL = os.environ.get("MINIMAL", "0").strip().lower() not in {"0", "false", "no"}
 PIPELINE_PREPROC_BACKEND = os.environ.get("PIPELINE_PREPROC_BACKEND", "").strip() or None
 PIPELINE_IE_CONFIG = os.environ.get("PIPELINE_IE_CONFIG", "PERFORMANCE_HINT=LATENCY").strip() or None
+PIPELINE_BACKEND = os.environ.get("PIPELINE_BACKEND", "gvadetect").strip().lower() or "gvadetect"
 # 0 = unlimited (default for live demo). Set PIPELINE_FRAME_LIMIT=N to cap
 # at N frames — useful for benchmarking runs that should auto-terminate.
 FRAME_LIMIT  = int(os.environ.get("PIPELINE_FRAME_LIMIT", "0"))
@@ -181,9 +182,15 @@ def _spawn(
             )
         except Exception as _exc:  # noqa: BLE001
             log.warning("[basler] pypylon enumeration failed: %s", _exc)
-        cmd = f"exec {gst_exec}gst-launch-1.0 {pipeline}"
+        if PIPELINE_BACKEND == "appsink":
+            cmd = "exec python3 /opt/appsink_infer.py"
+        else:
+            cmd = f"exec {gst_exec}gst-launch-1.0 {pipeline}"
     else:
-        cmd = f"exec gst-launch-1.0 {pipeline}"
+        if PIPELINE_BACKEND == "appsink":
+            cmd = "exec python3 /opt/appsink_infer.py"
+        else:
+            cmd = f"exec gst-launch-1.0 {pipeline}"
 
     log.info("[pipeline] generated cmd: %s", cmd)
     log.info(
@@ -197,7 +204,8 @@ def _spawn(
         BASLER_PIXEL_FORMAT,
     )
     log.info(
-        "[pipeline] knobs: detect=%s watermark=%s fpscounter=%s identity=%s minimal=%s preproc=%s ie_config=%s scheduling_policy=%s batch_size=%s sink_sync=%s",
+        "[pipeline] knobs: backend=%s detect=%s watermark=%s fpscounter=%s identity=%s minimal=%s preproc=%s ie_config=%s scheduling_policy=%s batch_size=%s sink_sync=%s",
+        PIPELINE_BACKEND,
         DETECT_ENABLED,
         WATERMARK_ENABLED,
         FPSCOUNTER_ENABLED,
