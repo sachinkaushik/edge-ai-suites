@@ -108,3 +108,7 @@ docker-compose.*.override.yaml
 # Local training data / model artifacts (not versioned; bind-mounted at runtime)
 datasets/
 models/
+
+# Endoscopy POC — track sources only, not the local venv or model symlink
+endoscopy-poc/.venv/
+endoscopy-poc/best_openvino_model

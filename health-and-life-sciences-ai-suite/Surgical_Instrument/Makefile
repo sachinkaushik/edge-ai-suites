@@ -73,6 +73,9 @@ WATERMARK             ?= 1
 # for clean EOS termination in bench runs.
 PIPELINE_IDENTITY     ?= 0
 MINIMAL               ?= 0
+# Basler ingest path: gencamsrc (DL Streamer, default) or engine (DL-Streamer-
+# free pypylon + OpenVINO, pipeline/basler_engine.py).
+PIPELINE_BASLER_INGEST ?=
 # PIPELINE_SINK_SYNC=true|false forces the video sink's `sync=` property
 # (aka clock-sync). Empty (default) picks sync=true for file sources and
 # sync=false for live basler sources.
@@ -207,6 +210,7 @@ up:  ## First-boot: build images + start stack. May take 20-35 min if no cached 
 	PIPELINE_FPSCOUNTER=$(PIPELINE_FPSCOUNTER) \
 	BASLER_FIXED_CAMERA=$(BASLER_FIXED_CAMERA) BASLER_EXPOSURE_US=$(BASLER_EXPOSURE_US) BASLER_GAIN=$(BASLER_GAIN) \
 	BASLER_PIXEL_FORMAT=$(BASLER_PIXEL_FORMAT) \
+	PIPELINE_BASLER_INGEST=$(PIPELINE_BASLER_INGEST) \
 	RENDER_GID=$(RENDER_GID) VIDEO_GID=$(VIDEO_GID) \
 		$(COMPOSE) $(_COMPOSE_FILES) up -d $(_BUILD_FLAG)
 	@echo "[up] image mode: $(if $(filter true,$(REGISTRY)),REGISTRY (prebuilt images @ $(TAG)),SOURCE (built from Dockerfiles))"
@@ -236,6 +240,7 @@ run:  ## Fast subsequent boot: start stack without rebuild. Requires cached IR.
 	PIPELINE_FPSCOUNTER=$(PIPELINE_FPSCOUNTER) \
 	BASLER_FIXED_CAMERA=$(BASLER_FIXED_CAMERA) BASLER_EXPOSURE_US=$(BASLER_EXPOSURE_US) BASLER_GAIN=$(BASLER_GAIN) \
 	BASLER_PIXEL_FORMAT=$(BASLER_PIXEL_FORMAT) \
+	PIPELINE_BASLER_INGEST=$(PIPELINE_BASLER_INGEST) \
 	RENDER_GID=$(RENDER_GID) VIDEO_GID=$(VIDEO_GID) \
 		$(COMPOSE) $(_COMPOSE_FILES) up -d
 	$(_print_urls)

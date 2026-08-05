@@ -16,9 +16,9 @@ FROM intel/dlstreamer-pipeline-server:2026.1.0-ubuntu24
 
 USER root
 
-# Flask for the control plane HTTP API. pypylon remains available for local
-# Basler serial enumeration, while pylon SDK + gencamsrc provide the live
-# GStreamer camera source used by the runtime pipeline.
+# Flask for the control plane HTTP API. pypylon 26.2.1 + OpenVINO (base image)
+# + OpenCV drive the DL-Streamer-free basler_engine.py path; the pylon SDK +
+# gencamsrc below still provide the legacy GStreamer camera source.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       cmake \
@@ -34,7 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/* \
  && pip install --no-cache-dir --retries 4 --timeout 60 \
       flask==3.0.3 \
-      pypylon==4.0.0
+      pypylon==26.2.1 \
+      numpy \
+      opencv-python
 
 RUN cd /tmp \
  && wget -q https://downloads-ctf.baslerweb.com/dg51pdwahxgw/16EbjATpV78LtOFUQ1VpJM/ab3db40227afb59df3eb1cccf0c5addc/pylon-7.5.0.15658-linux-x86_64_debs.tar.gz \
@@ -68,6 +70,7 @@ COPY latency_tracer_sink.py /opt/latency_tracer_sink.py
 COPY bbox_filter.py         /opt/bbox_filter.py
 COPY watermark_green.py     /opt/watermark_green.py
 COPY basler_reader.py       /opt/basler_reader.py
+COPY basler_engine.py       /opt/basler_engine.py
 
 ENV PIPELINE_HTTP_PORT=8000
 

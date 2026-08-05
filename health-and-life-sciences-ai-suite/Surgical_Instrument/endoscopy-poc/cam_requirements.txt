@@ -1,0 +1,5 @@
+glfw==2.10.0
+opencv_python==4.13.0.92
+openvino==2026.0.0
+pypylon==26.2.1
+ultralytics==8.4.30

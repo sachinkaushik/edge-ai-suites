@@ -28,6 +28,12 @@ class RollingLatency:
             self._samples.clear()
             self._updated_at = 0.0
 
+    def add(self, latency_ms: float) -> None:
+        """Feed a latency sample directly (non-GStreamer engines)."""
+        with self._lock:
+            self._samples.append(float(latency_ms))
+            self._updated_at = time.time()
+
     def consume_line(self, line: str) -> bool:
         match = PIPELINE_LATENCY_RE.search(line)
         if not match:

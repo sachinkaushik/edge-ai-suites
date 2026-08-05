@@ -71,6 +71,9 @@ BASLER_FIXED_CAMERA = os.environ.get("BASLER_FIXED_CAMERA", "0").strip() not in 
 BASLER_EXPOSURE_US  = os.environ.get("BASLER_EXPOSURE_US", "").strip()
 BASLER_GAIN         = os.environ.get("BASLER_GAIN", "").strip()
 BASLER_PIXEL_FORMAT = os.environ.get("BASLER_PIXEL_FORMAT", "bayerbggr").strip() or "bayerbggr"
+# Basler ingest path: "gencamsrc" (DL Streamer, default) or "engine"
+# (DL-Streamer-free direct pypylon + OpenVINO — see basler_engine.py).
+BASLER_INGEST = os.environ.get("PIPELINE_BASLER_INGEST", "gencamsrc").strip().lower()
 # ---- GPU warmup -----------------------------------------------------------
 # The first GPU-inference process in a freshly (re)created container pays a
 # one-time OpenVINO/GPU init cost that throttles it to ~16 fps until the GPU
@@ -98,6 +101,23 @@ def _reap_if_dead() -> None:
     global _proc, _proc_device
     if _proc is not None and _proc.poll() is not None:
         _proc = None
+
+
+def _engine_cores(spec: str):
+    """From a taskset core spec ('0-3', '2,4,6') return (cam_cpu, inf_cpu)."""
+    spec = (spec or "").strip()
+    cores: list[int] = []
+    for part in spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            a, b = part.split("-", 1)
+            if a.isdigit() and b.isdigit():
+                cores.extend(range(int(a), int(b) + 1))
+        elif part.isdigit():
+            cores.append(int(part))
+    if not cores:
+        return None, None
+    return cores[0], (cores[-1] if len(cores) > 1 else cores[0])
 
 
 def _spawn(
@@ -167,7 +187,28 @@ def _spawn(
         log.warning("[case4] PIPELINE_GST_RT_PRIORITY=%s > 90; may starve host critical threads", _GST_PRIO)
 
     gst_exec = f"{gst_prefix} " if gst_prefix else ""
-    if source_kind == "basler":
+    if source_kind == "basler" and BASLER_INGEST == "engine":
+        # DL Streamer-free path: direct pypylon + OpenVINO (basler_engine.py).
+        # Drop the system pylon-7.5 GenTL path so bundled pypylon 26.2.1 is used.
+        env.pop("GENICAM_GENTL64_PATH", None)
+        cam_cpu, inf_cpu = _engine_cores(_GST_CORES)
+        eng_args = [
+            "python3 -u /opt/basler_engine.py",
+            f"--device {device}",
+            "--resolution 1280,720",
+            f"--model {shlex.quote(IR_XML)}",
+            f"--threshold {THRESHOLD}",
+            "--duration 0",
+            "--emit-tracer",
+        ]
+        if cam_cpu is not None:
+            eng_args.append(f"--cam-cpu {cam_cpu}")
+        if inf_cpu is not None:
+            eng_args.append(f"--inf-cpu {inf_cpu}")
+        if use_display:
+            eng_args.append("--display")
+        cmd = f"exec {gst_exec}{' '.join(eng_args)}"
+    elif source_kind == "basler":
         # Enumerate Basler cameras visible inside the container before spawning
         # so connectivity problems appear immediately in the logs.
         try:
