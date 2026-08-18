@@ -56,6 +56,10 @@ make up SOURCE=file SOURCE_ARG=/videos/polyp_test.mp4
 
 # USB / V4L2 webcam.
 make up SOURCE=webcam DEVICE_INDEX=0
+
+# Select the OpenVINO inference device (default: GPU).
+make up SERIAL=<SERIAL_NUMBER> DEVICE=CPU
+make up SERIAL=<SERIAL_NUMBER> DEVICE=NPU   # requires /dev/accel on the host
 ```
 
 ### 2b. Build the image from source

@@ -65,6 +65,10 @@ NO_PROXY     ?=
 
 COMPOSE      := docker compose --project-directory . -f docker/docker-compose.yaml
 REGISTRY_LOWER := $(shell echo $(REGISTRY) | tr A-Z a-z)
+DEVICE_UPPER   := $(shell echo $(DEVICE) | tr a-z A-Z)
+ifeq ($(DEVICE_UPPER),NPU)
+COMPOSE := $(COMPOSE) -f docker/docker-compose.npu.yaml
+endif
 
 # Unified compose runtime selector:
 #   SOURCE=file|camera|webcam|basler|v4l2
@@ -136,6 +140,7 @@ up: _xhost ## Start stack for all variations (SOURCE=file|camera|webcam, REGISTR
 	FULLSCREEN="$(FULLSCREEN)" LATENCY_TRACE="$(LATENCY_TRACE)" \
 	VSYNC_DIVISOR="$(VSYNC_DIVISOR)" EXPOSURE_US="$(EXPOSURE_US)" \
 	MODELS_DIR="$(MODELS_DIR)" VIDEOS_DIR="$(VIDEOS_DIR)" \
+	DEVICE="$(DEVICE)" \
 	$(COMPOSE) up -d
 
 .PHONY: down

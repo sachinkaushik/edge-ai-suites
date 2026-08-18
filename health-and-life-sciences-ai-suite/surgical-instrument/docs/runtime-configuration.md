@@ -56,10 +56,18 @@ make up LOWLATENCY=1 CAMERA_TRIGGER=vsync VSYNC_DIVISOR=2 SERIAL=<SERIAL_NUMBER>
 
 | Param | Values | Effect |
 |---|---|---|
-| `DEVICE` | `GPU` / `CPU` / `NPU` | OpenVINO inference device. |
+| `DEVICE` | `GPU` / `CPU` / `NPU` | OpenVINO inference device. `GPU` uses `/dev/dri` (mounted by default). `NPU` requires `/dev/accel` on the host and is auto-mounted via `docker/docker-compose.npu.yaml`. |
 | `THRESHOLD` | `0.0`-`1.0` | Detection confidence cutoff. |
 | `FRAME_SKIP` | integer | Run inference every Nth captured frame. Display still shows every captured frame. |
 | `MODEL` | container path | OpenVINO IR (`best.xml`) inside the container. |
+
+Examples:
+
+```bash
+make up SERIAL=<SERIAL_NUMBER> DEVICE=GPU   # default
+make up SERIAL=<SERIAL_NUMBER> DEVICE=CPU
+make up SERIAL=<SERIAL_NUMBER> DEVICE=NPU   # requires /dev/accel on the host
+```
 
 ## Bind-mount paths
 
