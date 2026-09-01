@@ -155,10 +155,11 @@ class BaslerSource:
         self._conv = pylon.ImageFormatConverter()
         self._conv.OutputPixelFormat = pylon.PixelType_BGR8packed
         self._conv.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
-        # LatestImageOnly for free-run; triggered mode grabs exactly what it fires.
-        strategy = (pylon.GrabStrategy_OneByOne if self._triggered
-                    else pylon.GrabStrategy_LatestImageOnly)
-        self._cam.StartGrabbing(strategy)
+        # Always LatestImageOnly: the grab result queue holds only the newest frame
+        # (zero queue), even when software-triggered. This mirrors the reference and
+        # is what the BU team requires -- OneByOne builds an in-order backlog that
+        # shows up as a "queue of frames" and adds photon-to-pixel latency.
+        self._cam.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
  
     def _try(self, node: str, value) -> None:  # noqa: ANN001
         try:

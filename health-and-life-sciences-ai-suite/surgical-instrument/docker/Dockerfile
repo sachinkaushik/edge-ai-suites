@@ -45,7 +45,7 @@ RUN python3 -c "import pypylon" 2>/dev/null || pip install --no-cache-dir pypylo
  
 # --- App ---------------------------------------------------------------------
 WORKDIR /app
-COPY src/app.py src/detector.py src/sources.py src/config.py src/display.py /app/
+COPY src/app.py src/detector.py src/sources.py src/config.py src/display.py src/vsync.py /app/
  
 # Sensible container defaults; override with `docker run -e ...` or Makefile.
 ENV MODEL=/models/yolo11n_polyp/best_openvino_model/best.xml \
