@@ -55,6 +55,11 @@ endif
 VSYNC_DIVISOR  ?= 2
 # fixed exposure in us ("" = leave camera as-is; lower = less latency but darker)
 EXPOSURE_US    ?=
+# CPU-core pinning + SCHED_FIFO priority for the capture/inference/display threads.
+CPU_CAPTURE    ?=
+CPU_INFERENCE  ?=
+CPU_DISPLAY    ?=
+RT_PRIORITY    ?= 0
 # extra flags, e.g. EXTRA="--frame-skip 2"
 EXTRA          ?=
 
@@ -112,7 +117,7 @@ show-cores: ## Show P-core / E-core CPU sets for --cpu-* pinning
 	if [ -n "$$PCORE" ]; then \
 	  printf '[cores] P-cores (perf)  : %s  <-- pin --cpu-capture/--cpu-inference/--cpu-display here\n' "$$PCORE"; \
 	  printf '[cores] E-cores (effic) : %s\n' "$$ECORE"; \
-	  printf '[cores] hint: EXTRA="--cpu-capture 1 --cpu-inference 2 --cpu-display 3 --rt-priority 20"\n'; \
+	  printf '[cores] hint: CPU_CAPTURE=1 CPU_INFERENCE=2 CPU_DISPLAY=3 RT_PRIORITY=80\n'; \
 	else \
 	  printf '[cores] no P/E core split detected (non-hybrid CPU or older kernel)\n'; \
 	  printf '[cores] all cores are equivalent; pick any distinct --cpu-* indices.\n'; \
@@ -140,6 +145,8 @@ up: _xhost ## Start stack for all variations (SOURCE=file|camera|webcam, REGISTR
 	FULLSCREEN="$(FULLSCREEN)" LATENCY_TRACE="$(LATENCY_TRACE)" \
 	VSYNC_DIVISOR="$(VSYNC_DIVISOR)" EXPOSURE_US="$(EXPOSURE_US)" \
 	MODELS_DIR="$(MODELS_DIR)" VIDEOS_DIR="$(VIDEOS_DIR)" \
+	CPU_CAPTURE="$(CPU_CAPTURE)" CPU_INFERENCE="$(CPU_INFERENCE)" \
+	CPU_DISPLAY="$(CPU_DISPLAY)" RT_PRIORITY="$(RT_PRIORITY)" \
 	DEVICE="$(DEVICE)" \
 	$(COMPOSE) up -d
 

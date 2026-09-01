@@ -84,24 +84,24 @@ make up SERIAL=<SERIAL_NUMBER> DEVICE=NPU   # requires /dev/accel on the host
 | `REGISTRY_URL` | `intel/` | Prefix used to resolve the pulled image. |
 | `TAG` | `latest` | Image tag. |
 
-## CLI flags via `EXTRA`
+## Core pinning + real-time priority
 
-Any additional app flag can be forwarded through `EXTRA`. Common examples:
+Pin the capture / inference / display threads to dedicated CPU cores and raise
+their scheduling priority. These are first-class `make up` variables:
 
 ```bash
-# Core pinning + real-time priority.
-make up SOURCE=camera SERIAL=<SERIAL_NUMBER> \
-  EXTRA="--cpu-capture 1 --cpu-inference 2 --cpu-display 3 --rt-priority 20"
-
-# Cap capture rate (only when CAMERA_TRIGGER=off).
-make up SOURCE=camera SERIAL=<SERIAL_NUMBER> EXTRA="--camera-fps 60"
-
-# Headless run (no display window).
-make up SOURCE=file SOURCE_ARG=/videos/polyp_test.mp4 EXTRA="--headless"
+make up SOURCE=camera LOWLATENCY=1 CAMERA_TRIGGER=vsync VSYNC_DIVISOR=2 SERIAL=<SERIAL_NUMBER> \
+  CPU_CAPTURE=1 CPU_INFERENCE=2 CPU_DISPLAY=3 RT_PRIORITY=80
 ```
 
-`--rt-priority > 0` uses `SCHED_FIFO` (needs `CAP_SYS_NICE`, granted by the
-Makefile). It falls back to normal scheduling when not permitted.
+Use `make show-cores` to see which cores are P-cores and pick distinct indices.
+`RT_PRIORITY > 0` uses `SCHED_FIFO` (needs `CAP_SYS_NICE` + `rtprio` ulimit,
+both granted by the compose file). It falls back to normal scheduling when not
+permitted.
+
+Other single-purpose knobs have their own variables — e.g. `CAMERA_FPS=60`
+(cap capture rate when `CAMERA_TRIGGER=off`) and `HEADLESS=1` (no display
+window).
 
 ## Full flag / env reference
 
@@ -127,6 +127,10 @@ Makefile). It falls back to normal scheduling when not permitted.
 | `--detection-ttl-ms` | `DETECTION_TTL_MS` | `200` | how long a detection stays overlaid |
 | `--no-loop` | `LOOP=0` | loop on | stop file at EOF instead of looping |
 | `--exposure-us` / `--gain` | `EXPOSURE_US` / `GAIN` | camera as-is | Basler manual exposure / gain |
+| `--cpu-capture` | `CPU_CAPTURE` | — | pin capture thread to this CPU core |
+| `--cpu-inference` | `CPU_INFERENCE` | — | pin inference thread to this CPU core |
+| `--cpu-display` | `CPU_DISPLAY` | — | pin display thread to this CPU core |
+| `--rt-priority` | `RT_PRIORITY` | `0` | `SCHED_FIFO` priority (0 = normal scheduling) |
 
 ## Latency reality check
 

@@ -31,7 +31,7 @@ different.
 
 ```bash
 make list-cameras   # prints Basler serial(s) + model -> use as SERIAL=
-make show-cores     # prints P-core / E-core CPU sets  -> use with EXTRA="--cpu-*"
+make show-cores     # prints P-core / E-core CPU sets  -> use with CPU_CAPTURE/CPU_INFERENCE/CPU_DISPLAY
 ```
 
 ## 2. Bring the stack up
@@ -45,7 +45,15 @@ make show-cores     # prints P-core / E-core CPU sets  -> use with EXTRA="--cpu-
 knobs applied through Docker Compose.
 
 ```bash
-# Low-latency live Basler camera (recommended defaults).
+# Low-latency live Basler camera (recommended tuned defaults).
+# vsync-phase-locked capture + fixed 2ms exposure + core-pinned, SCHED_FIFO
+# capture/inference/display threads — the configuration validated for lowest
+# camera-to-screen latency.
+make up SOURCE=camera LOWLATENCY=1 CAMERA_TRIGGER=vsync VSYNC_DIVISOR=2 EXPOSURE_US=2000 \
+  DEVICE=GPU FRAME_SKIP=3 SERIAL=<SERIAL_NUMBER> \
+  CPU_CAPTURE=1 CPU_INFERENCE=2 CPU_DISPLAY=3 RT_PRIORITY=80
+
+# Minimal low-latency (let the app pick exposure / no core pinning).
 make up LOWLATENCY=1 CAMERA_TRIGGER=vsync VSYNC_DIVISOR=2 SERIAL=<SERIAL_NUMBER>
 
 # Baseline free-running camera.

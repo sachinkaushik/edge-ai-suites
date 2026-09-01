@@ -38,6 +38,10 @@ services:
       FULLSCREEN: ${FULLSCREEN:-0}
       LATENCY_TRACE: ${LATENCY_TRACE:-0}
       HEADLESS: ${HEADLESS:-0}
+      CPU_CAPTURE: ${CPU_CAPTURE:-}
+      CPU_INFERENCE: ${CPU_INFERENCE:-}
+      CPU_DISPLAY: ${CPU_DISPLAY:-}
+      RT_PRIORITY: ${RT_PRIORITY:-0}
     volumes:
       - ${MODELS_DIR:-../models}:/models:ro
       - ${VIDEOS_DIR:-../videos}:/videos:rw
