@@ -31,7 +31,7 @@ VALID_SOURCE_KINDS = {"file", "basler"}
 PRE_DETECT_QUEUE_FILE   = "queue max-size-buffers=1"
 POST_DETECT_QUEUE_FILE  = "queue max-size-buffers=1"
 PRE_DETECT_QUEUE_LIVE   = "queue "
-POST_DETECT_QUEUE_LIVE  = "queue "
+POST_DETECT_QUEUE_LIVE  = "queue max-size-buffers=1 leaky=downstream"
 
 
 def _build_source(
@@ -45,6 +45,7 @@ def _build_source(
     basler_exposure_us: str | None = None,
     basler_gain: str | None = None,
     basler_throughput_limit: str | None = None,
+    basler_do_timestamp: bool = True,
 ) -> tuple[list[str], str]:
     """Return the source elements and the matching gvadetect preproc backend."""
     kind = kind.lower()
@@ -79,6 +80,12 @@ def _build_source(
             source_props.append(
                 f"throughput-limit={shlex.quote(basler_throughput_limit)}"
             )
+        # do-timestamp stamps buffers with the pipeline running-time on
+        # capture; keep on for live latency accounting, off to defer to
+        # downstream timestamping.
+        source_props.append(
+            f"do-timestamp={'true' if basler_do_timestamp else 'false'}"
+        )
         if basler_fixed_camera:
             source_props.append("exposure-auto=off")
             if basler_exposure_us:
@@ -154,6 +161,7 @@ def build(
     basler_exposure_us: str | None = None,
     basler_gain: str | None = None,
     basler_throughput_limit: str | None = None,
+    basler_do_timestamp: bool = True,
 ) -> str:
     """Return the finalized single-branch gst-launch pipeline string.
 
@@ -182,6 +190,7 @@ def build(
         basler_exposure_us=basler_exposure_us,
         basler_gain=basler_gain,
         basler_throughput_limit=basler_throughput_limit,
+        basler_do_timestamp=basler_do_timestamp,
     )
 
     if requested_pre_proc:

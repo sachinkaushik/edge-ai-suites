@@ -39,7 +39,7 @@ services:
     build:
       context: ./pipeline
       dockerfile: Dockerfile
-    image: intel/surgical-pipeline:${TAG}
+    image: intel/surgical-pipeline:gencamsrc-fix
     container_name: surgical-pipeline
     restart: unless-stopped
     networks: [surgical-internal]
@@ -114,6 +114,9 @@ services:
       BASLER_GAIN:                 ${BASLER_GAIN:-}
       BASLER_THROUGHPUT_LIMIT:     ${BASLER_THROUGHPUT_LIMIT:-}
       BASLER_PIXEL_FORMAT:         ${BASLER_PIXEL_FORMAT:-bayerbggr}
+      BASLER_DO_TIMESTAMP:         ${BASLER_DO_TIMESTAMP:-1}
+      PIPELINE_GST_DEBUG:          ${PIPELINE_GST_DEBUG:-}
+      PIPELINE_GST_DEBUG_FILE:     ${PIPELINE_GST_DEBUG_FILE:-}
       # Startup GPU warmup: pre-warms OpenVINO/GPU state so the first /start
       # after a container (re)create runs at full fps instead of a cold ~16 fps.
       DETECTION_DEVICE:            ${DETECTION_DEVICE:-GPU}

@@ -72,6 +72,14 @@ BASLER_EXPOSURE_US  = os.environ.get("BASLER_EXPOSURE_US", "").strip()
 BASLER_GAIN         = os.environ.get("BASLER_GAIN", "").strip()
 BASLER_THROUGHPUT_LIMIT = os.environ.get("BASLER_THROUGHPUT_LIMIT", "").strip()
 BASLER_PIXEL_FORMAT = os.environ.get("BASLER_PIXEL_FORMAT", "bayerbggr").strip() or "bayerbggr"
+BASLER_DO_TIMESTAMP = os.environ.get("BASLER_DO_TIMESTAMP", "1").strip().lower() not in {"0", "false", "no"}
+# ---- Optional GStreamer debug logging -------------------------------------
+# PIPELINE_GST_DEBUG appends extra categories to the mandatory GST_TRACER:7
+# (kept so latency parsing on stderr still works). PIPELINE_GST_DEBUG_FILE
+# redirects gst debug output to a file inside the container.
+GST_DEBUG_EXTRA = os.environ.get("PIPELINE_GST_DEBUG", "").strip()
+GST_DEBUG_FILE  = os.environ.get("PIPELINE_GST_DEBUG_FILE", "").strip()
+BASLER_DO_TIMESTAMP = os.environ.get("BASLER_DO_TIMESTAMP", "1").strip().lower() not in {"0", "false", "no"}
 # ---- GPU warmup -----------------------------------------------------------
 # The first GPU-inference process in a freshly (re)created container pays a
 # one-time OpenVINO/GPU init cost that throttles it to ~16 fps until the GPU
@@ -140,16 +148,20 @@ def _spawn(
         basler_exposure_us=BASLER_EXPOSURE_US or None,
         basler_gain=BASLER_GAIN or None,
         basler_throughput_limit=BASLER_THROUGHPUT_LIMIT or None,
+        basler_do_timestamp=BASLER_DO_TIMESTAMP,
     )
 
     env = os.environ.copy()
+    gst_debug = f"GST_TRACER:7,{GST_DEBUG_EXTRA}" if GST_DEBUG_EXTRA else "GST_TRACER:7"
     env.update(
         {
             "GST_TRACERS": "latency(flags=pipeline)",
-            "GST_DEBUG": "GST_TRACER:7",
+            "GST_DEBUG": gst_debug,
             "GST_DEBUG_NO_COLOR": "1",
         }
     )
+    if GST_DEBUG_FILE:
+        env["GST_DEBUG_FILE"] = GST_DEBUG_FILE
 
     # ---- Build optional taskset / chrt prefix strings ----
     # Each leg requires BOTH cores and priority to be set; partial config is

@@ -55,11 +55,13 @@ RUN cd /tmp \
 # gencamsrc fix — overwrite upstream plugins/genicam.{h,cc} before building
 COPY genicam.h  /tmp/gencamsrc-fix/genicam.h
 COPY genicam.cc /tmp/gencamsrc-fix/genicam.cc
+COPY gstgencamsrc.c /tmp/gencamsrc-fix/gstgencamsrc.c
 
 RUN git clone --depth 1 --branch release-2026.1.0 https://github.com/open-edge-platform/edge-ai-libraries.git /tmp/edge-ai-libraries \
  && cp -r /tmp/edge-ai-libraries/microservices/dlstreamer-pipeline-server/plugins/camera/src-gst-gencamsrc /home/pipeline-server/src-gst-gencamsrc \
  && cp /tmp/gencamsrc-fix/genicam.h  /home/pipeline-server/src-gst-gencamsrc/plugins/genicam.h \
  && cp /tmp/gencamsrc-fix/genicam.cc /home/pipeline-server/src-gst-gencamsrc/plugins/genicam.cc \
+ && cp /tmp/gencamsrc-fix/gstgencamsrc.c /home/pipeline-server/src-gst-gencamsrc/plugins/gstgencamsrc.c \
  && cd /home/pipeline-server/src-gst-gencamsrc \
  && cmake -B build -DCMAKE_BUILD_TYPE=Release \
  && cmake --build build -j$(nproc) \

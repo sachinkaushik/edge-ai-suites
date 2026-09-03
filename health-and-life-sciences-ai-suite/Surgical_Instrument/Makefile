@@ -119,6 +119,12 @@ BASLER_EXPOSURE_US   ?=
 BASLER_GAIN          ?=
 BASLER_THROUGHPUT_LIMIT ?=
 BASLER_PIXEL_FORMAT  ?= bayerbggr
+# gencamsrc do-timestamp (buffer PTS stamping on capture). 1=true (default), 0=false.
+BASLER_DO_TIMESTAMP  ?= 1
+# Optional GStreamer debug logging (empty = off).
+#   make up PIPELINE_GST_DEBUG=xvcontext:5,queue:7,gencamsrc:7 PIPELINE_GST_DEBUG_FILE=/tmp/gst.log
+PIPELINE_GST_DEBUG       ?=
+PIPELINE_GST_DEBUG_FILE  ?=
 
 # Render/video GIDs are auto-detected from the host so /dev/dri passthrough
 # works without editing this file. Override on the CLI if needed.
@@ -212,6 +218,8 @@ up:  ## First-boot: build images + start stack. May take 20-35 min if no cached 
 	BASLER_FIXED_CAMERA=$(BASLER_FIXED_CAMERA) BASLER_EXPOSURE_US=$(BASLER_EXPOSURE_US) BASLER_GAIN=$(BASLER_GAIN) \
 	BASLER_THROUGHPUT_LIMIT=$(BASLER_THROUGHPUT_LIMIT) \
 	BASLER_PIXEL_FORMAT=$(BASLER_PIXEL_FORMAT) \
+	BASLER_DO_TIMESTAMP=$(BASLER_DO_TIMESTAMP) \
+	PIPELINE_GST_DEBUG=$(PIPELINE_GST_DEBUG) PIPELINE_GST_DEBUG_FILE=$(PIPELINE_GST_DEBUG_FILE) \
 	RENDER_GID=$(RENDER_GID) VIDEO_GID=$(VIDEO_GID) \
 		$(COMPOSE) -f docker-compose.yaml $$(test -f $(CAMERA_OVERRIDE) && echo -f $(CAMERA_OVERRIDE)) up -d $(_BUILD_FLAG)
 	@echo "[up] image mode: $(if $(filter true,$(REGISTRY)),REGISTRY (prebuilt images @ $(TAG)),SOURCE (built from Dockerfiles))"
@@ -242,6 +250,8 @@ run:  ## Fast subsequent boot: start stack without rebuild. Requires cached IR.
 	BASLER_FIXED_CAMERA=$(BASLER_FIXED_CAMERA) BASLER_EXPOSURE_US=$(BASLER_EXPOSURE_US) BASLER_GAIN=$(BASLER_GAIN) \
 	BASLER_THROUGHPUT_LIMIT=$(BASLER_THROUGHPUT_LIMIT) \
 	BASLER_PIXEL_FORMAT=$(BASLER_PIXEL_FORMAT) \
+	BASLER_DO_TIMESTAMP=$(BASLER_DO_TIMESTAMP) \
+	PIPELINE_GST_DEBUG=$(PIPELINE_GST_DEBUG) PIPELINE_GST_DEBUG_FILE=$(PIPELINE_GST_DEBUG_FILE) \
 	RENDER_GID=$(RENDER_GID) VIDEO_GID=$(VIDEO_GID) \
 		$(COMPOSE) -f docker-compose.yaml $$(test -f $(CAMERA_OVERRIDE) && echo -f $(CAMERA_OVERRIDE)) up -d
 	$(_print_urls)

@@ -377,6 +377,8 @@ bool Genicam::Create (GstBuffer ** buf, GstMapInfo * mapInfo)
         return FALSE;
       }
     }
+    // marks end of the blocking wait for the next camera frame
+    GST_DEBUG_OBJECT (gencamsrc, "grab done");
     guint
         globalSize = buffer->getGlobalSize ();
     guint64
@@ -387,10 +389,12 @@ bool Genicam::Create (GstBuffer ** buf, GstMapInfo * mapInfo)
       GST_ERROR_OBJECT (gencamsrc, "Buffer couldn't be allocated");
       return FALSE;
     }
+    GST_DEBUG_OBJECT (gencamsrc, "alloc done");
     GST_BUFFER_PTS (*buf) = timestampNS;
     gst_buffer_map (*buf, mapInfo, GST_MAP_WRITE);
 
     memcpy (mapInfo->data, buffer->getGlobalBase (), mapInfo->size);
+    GST_DEBUG_OBJECT (gencamsrc, "memcpy done");
 
     // For Non continuous modes, execute TriggerSoftware command
     if (acquisitionMode != "Continuous") {
